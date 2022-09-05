@@ -4,6 +4,7 @@ use nih_plug_vizia::ViziaState;
 use std::sync::Arc;
 
 mod editor;
+mod pitch;
 
 /// The time it takes for the peak meter to decay by 12 dB after switching to complete silence.
 const PEAK_METER_DECAY_MS: f64 = 150.0;
@@ -20,6 +21,8 @@ pub struct VoiceMaster {
     ///
     /// This is stored as voltage gain.
     peak_meter: Arc<AtomicF32>,
+    /// sample rate
+    sample_rate: f32,
 }
 
 #[derive(Params)]
@@ -44,6 +47,7 @@ impl Default for VoiceMaster {
 
             peak_meter_decay_weight: 1.0,
             peak_meter: Arc::new(AtomicF32::new(util::MINUS_INFINITY_DB)),
+            sample_rate: 0.0,
         }
     }
 }
@@ -81,8 +85,8 @@ impl Plugin for VoiceMaster {
 
     const VERSION: &'static str = "0.0.1";
 
-    const DEFAULT_INPUT_CHANNELS: u32 = 2;
-    const DEFAULT_OUTPUT_CHANNELS: u32 = 2;
+    const DEFAULT_INPUT_CHANNELS: u32 = 1;
+    const DEFAULT_OUTPUT_CHANNELS: u32 = 1;
 
     const DEFAULT_AUX_INPUTS: Option<AuxiliaryIOConfig> = None;
     const DEFAULT_AUX_OUTPUTS: Option<AuxiliaryIOConfig> = None;
@@ -120,6 +124,7 @@ impl Plugin for VoiceMaster {
         self.peak_meter_decay_weight = 0.25f64
                                         .powf((buffer_config.sample_rate as f64 * PEAK_METER_DECAY_MS / 1000.0).recip())
                                         as f32;
+        self.sample_rate = buffer_config.sample_rate;
 
         true
     }
@@ -156,6 +161,8 @@ impl Plugin for VoiceMaster {
                     .store(new_peak_meter, std::sync::atomic::Ordering::Relaxed)
             }
         }
+
+        pitch::pitch(self.sample_rate, buffer);
 
         ProcessStatus::Normal
     }
