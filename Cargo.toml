@@ -10,7 +10,8 @@ license = "GPL-3.0-or-later"
 members = ["xtask"]
 
 [lib]
-crate-type = ["cdylib"]
+# The `lib` artifact is needed for the standalone target
+crate-type = ["cdylib", "lib"]
 
 [dependencies]
 # Remove the `assert_process_allocs` feature to allow allocations on the audio
@@ -19,3 +20,7 @@ nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", features = ["a
 # Uncomment the below line to disable the on-by-default VST3 feature to remove
 # the GPL compatibility requirement
 # nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", default_features = false, features = ["assert_process_allocs"] }
+
+nih_plug_vizia = { git = "https://github.com/robbert-vdh/nih-plug.git" }
+
+atomic_float = "0.1"
