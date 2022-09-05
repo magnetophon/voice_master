@@ -9,6 +9,9 @@ mod pitch;
 /// The time it takes for the peak meter to decay by 12 dB after switching to complete silence.
 const PEAK_METER_DECAY_MS: f64 = 150.0;
 
+/// The block-size of the signal that is fed to the pitch tracker
+const SIGNAL_SIZE: usize = 2048;
+
 /// This is mostly identical to the gain example, minus some fluff, and with a GUI.
 pub struct VoiceMaster {
     params: Arc<VoiceMasterParams>,
@@ -23,6 +26,8 @@ pub struct VoiceMaster {
     peak_meter: Arc<AtomicF32>,
     /// sample rate
     sample_rate: f32,
+    signal: Vec<f32>,
+
 }
 
 #[derive(Params)]
@@ -48,6 +53,7 @@ impl Default for VoiceMaster {
             peak_meter_decay_weight: 1.0,
             peak_meter: Arc::new(AtomicF32::new(util::MINUS_INFINITY_DB)),
             sample_rate: 0.0,
+            signal: vec![0.0;SIGNAL_SIZE],
         }
     }
 }
@@ -125,6 +131,8 @@ impl Plugin for VoiceMaster {
                                         .powf((buffer_config.sample_rate as f64 * PEAK_METER_DECAY_MS / 1000.0).recip())
                                         as f32;
         self.sample_rate = buffer_config.sample_rate;
+        self.signal
+            .reserve(SIGNAL_SIZE.saturating_sub(self.signal.capacity()));
 
         true
     }
@@ -135,6 +143,7 @@ impl Plugin for VoiceMaster {
         _aux: &mut AuxiliaryBuffers,
         _context: &mut impl ProcessContext,
     ) -> ProcessStatus {
+        let mut signal_index: usize = 0;
         for channel_samples in buffer.iter_samples() {
             let mut amplitude = 0.0;
             let num_samples = channel_samples.len();
@@ -143,8 +152,9 @@ impl Plugin for VoiceMaster {
             for sample in channel_samples {
                 *sample *= gain;
                 amplitude += *sample;
+                self.signal[signal_index] = *sample as f32;
+                signal_index = (signal_index + 1) % SIGNAL_SIZE;
             }
-
             // To save resources, a plugin can (and probably should!) only perform expensive
             // calculations that are only displayed on the GUI while the GUI is open
             if self.params.editor_state.is_open() {
@@ -162,7 +172,7 @@ impl Plugin for VoiceMaster {
             }
         }
 
-        pitch::pitch(self.sample_rate, buffer);
+        pitch::pitch(self.sample_rate, &self.signal);
 
         ProcessStatus::Normal
     }

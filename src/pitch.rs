@@ -1,8 +1,7 @@
-use nih_plug::buffer::Buffer;
 use pitch_detection::detector::mcleod::McLeodDetector;
 use pitch_detection::detector::PitchDetector;
 
-pub(crate) fn pitch(sample_rate: f32, buffer: &mut Buffer) {
+pub(crate) fn pitch(sample_rate: f32, signal: &Vec<f32>) {
     // Include only notes that exceed a power threshold which relates to the
     // amplitude of frequencies in the signal. Use the suggested default
     // value of 5.0 from the library.
@@ -14,15 +13,9 @@ pub(crate) fn pitch(sample_rate: f32, buffer: &mut Buffer) {
     // (valid values are in the range 0-1).
     const CLARITY_THRESHOLD: f32 = 0.0;
 
-    let mut signal: Vec<f32> = vec![];
-
-    for channel_samples in buffer.iter_samples() {
-        for sample in channel_samples {
-            signal.push(*sample as f32);
-        }
-    }
 
     let size = signal.len() as usize;
+
     let padding = size / 2 as usize;
 
     let mut detector = McLeodDetector::new(size, padding);
