@@ -1,0 +1,24 @@
+let
+  moz_overlay = import (builtins.fetchTarball
+    "https://github.com/mozilla/nixpkgs-mozilla/archive/master.tar.gz");
+  nixpkgs = import <nixpkgs> { overlays = [ moz_overlay ]; };
+in with nixpkgs;
+  stdenv.mkDerivation {
+    name = "moz_overlay_shell";
+    nativeBuildInputs = [ pkgconfig clang lld ];
+    buildInputs = [
+      (nixpkgs.rustChannelOf { date = "2022-07-02"; channel = "nightly"; }).rust
+      rustup
+      pkgconfig
+
+      libjack2
+
+      libGL
+      xorg.libXcursor
+      xorg.libX11 # libX11-xcb.so
+      xorg.xcbutilwm # libxcb-icccm.so
+
+      python3
+    ];
+
+  }
