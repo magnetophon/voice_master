@@ -12,6 +12,7 @@ in with nixpkgs;
       pkgconfig
 
       libjack2
+      alsa-lib
 
       libGL
       xorg.libXcursor
