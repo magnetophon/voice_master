@@ -26,7 +26,6 @@ pub struct VoiceMaster {
     sample_rate: f32,
     signal: Vec<f32>,
     /// The block-size of the signal that is fed to the pitch tracker
-    signal_size: usize,
     signal_index: usize,
 
 
@@ -55,7 +54,6 @@ impl Default for VoiceMaster {
             peak_meter_decay_weight: 1.0,
             peak_meter: Arc::new(AtomicF32::new(util::MINUS_INFINITY_DB)),
             sample_rate: 0.0,
-            signal_size: 2048,
             signal: vec![0.0;2048],
             signal_index: 0,
         }
@@ -135,9 +133,8 @@ impl Plugin for VoiceMaster {
                                         .powf((buffer_config.sample_rate as f64 * PEAK_METER_DECAY_MS / 1000.0).recip())
                                         as f32;
         self.sample_rate = buffer_config.sample_rate;
-        self.signal_size = self.signal_size*(self.sample_rate as usize)/44100;
         self.signal
-            .resize(self.signal_size,0.0);
+            .resize(self.signal.len()*(self.sample_rate as usize)/44100,0.0);
 
         true
     }
@@ -157,10 +154,11 @@ impl Plugin for VoiceMaster {
                 *sample *= gain;
                 amplitude += *sample;
                 self.signal[self.signal_index] = *sample as f32;
-                if self.signal_index == self.signal_size-1 {
+                self.signal_index += 1;
+                if self.signal_index == self.signal.len() {
+                    self.signal_index = 0;
                     pitch::pitch(self.sample_rate, &self.signal);
                 }
-                self.signal_index = (self.signal_index + 1) % self.signal_size;
             }
             // To save resources, a plugin can (and probably should!) only perform expensive
             // calculations that are only displayed on the GUI while the GUI is open
