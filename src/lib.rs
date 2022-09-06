@@ -9,8 +9,6 @@ mod pitch;
 /// The time it takes for the peak meter to decay by 12 dB after switching to complete silence.
 const PEAK_METER_DECAY_MS: f64 = 150.0;
 
-/// The block-size of the signal that is fed to the pitch tracker
-const SIGNAL_SIZE: usize = 2048;
 
 /// This is mostly identical to the gain example, minus some fluff, and with a GUI.
 pub struct VoiceMaster {
@@ -27,6 +25,10 @@ pub struct VoiceMaster {
     /// sample rate
     sample_rate: f32,
     signal: Vec<f32>,
+    /// The block-size of the signal that is fed to the pitch tracker
+    signal_size: usize,
+    signal_index: usize,
+
 
 }
 
@@ -53,7 +55,9 @@ impl Default for VoiceMaster {
             peak_meter_decay_weight: 1.0,
             peak_meter: Arc::new(AtomicF32::new(util::MINUS_INFINITY_DB)),
             sample_rate: 0.0,
-            signal: vec![0.0;SIGNAL_SIZE],
+            signal_size: 2048,
+            signal: vec![0.0;2048],
+            signal_index: 0,
         }
     }
 }
@@ -131,8 +135,9 @@ impl Plugin for VoiceMaster {
                                         .powf((buffer_config.sample_rate as f64 * PEAK_METER_DECAY_MS / 1000.0).recip())
                                         as f32;
         self.sample_rate = buffer_config.sample_rate;
+        self.signal_size = self.signal_size*(self.sample_rate as usize)/44100;
         self.signal
-            .reserve(SIGNAL_SIZE.saturating_sub(self.signal.capacity()));
+            .resize(self.signal_size,0.0);
 
         true
     }
@@ -143,7 +148,6 @@ impl Plugin for VoiceMaster {
         _aux: &mut AuxiliaryBuffers,
         _context: &mut impl ProcessContext,
     ) -> ProcessStatus {
-        let mut signal_index: usize = 0;
         for channel_samples in buffer.iter_samples() {
             let mut amplitude = 0.0;
             let num_samples = channel_samples.len();
@@ -152,8 +156,11 @@ impl Plugin for VoiceMaster {
             for sample in channel_samples {
                 *sample *= gain;
                 amplitude += *sample;
-                self.signal[signal_index] = *sample as f32;
-                signal_index = (signal_index + 1) % SIGNAL_SIZE;
+                self.signal[self.signal_index] = *sample as f32;
+                if self.signal_index == self.signal_size-1 {
+                    pitch::pitch(self.sample_rate, &self.signal);
+                }
+                self.signal_index = (self.signal_index + 1) % self.signal_size;
             }
             // To save resources, a plugin can (and probably should!) only perform expensive
             // calculations that are only displayed on the GUI while the GUI is open
@@ -172,7 +179,6 @@ impl Plugin for VoiceMaster {
             }
         }
 
-        pitch::pitch(self.sample_rate, &self.signal);
 
         ProcessStatus::Normal
     }
@@ -196,5 +202,5 @@ impl Vst3Plugin for VoiceMaster {
     const VST3_CATEGORIES: &'static str = "Fx|Dynamics";
 }
 
-nih_export_clap!(VoiceMaster);
-nih_export_vst3!(VoiceMaster);
+// nih_export_clap!(VoiceMaster);
+// nih_export_vst3!(VoiceMaster);
