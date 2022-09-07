@@ -13,7 +13,6 @@ pub(crate) fn pitch(sample_rate: f32, signal: &Vec<f32>) {
     // (valid values are in the range 0-1).
     const CLARITY_THRESHOLD: f32 = 0.0;
 
-
     let size = signal.len() as usize;
 
     let padding = size / 2 as usize;

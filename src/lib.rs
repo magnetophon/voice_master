@@ -9,7 +9,6 @@ mod pitch;
 /// The time it takes for the peak meter to decay by 12 dB after switching to complete silence.
 const PEAK_METER_DECAY_MS: f64 = 150.0;
 
-
 /// This is mostly identical to the gain example, minus some fluff, and with a GUI.
 pub struct VoiceMaster {
     params: Arc<VoiceMasterParams>,
@@ -27,8 +26,6 @@ pub struct VoiceMaster {
     signal: Vec<f32>,
     /// The block-size of the signal that is fed to the pitch tracker
     signal_index: usize,
-
-
 }
 
 #[derive(Params)]
@@ -54,7 +51,7 @@ impl Default for VoiceMaster {
             peak_meter_decay_weight: 1.0,
             peak_meter: Arc::new(AtomicF32::new(util::MINUS_INFINITY_DB)),
             sample_rate: 0.0,
-            signal: vec![0.0;2048],
+            signal: vec![0.0; 2048],
             signal_index: 0,
         }
     }
@@ -130,11 +127,11 @@ impl Plugin for VoiceMaster {
         // After `PEAK_METER_DECAY_MS` milliseconds of pure silence, the peak meter's value should
         // have dropped by 12 dB
         self.peak_meter_decay_weight = 0.25f64
-                                        .powf((buffer_config.sample_rate as f64 * PEAK_METER_DECAY_MS / 1000.0).recip())
-                                        as f32;
+            .powf((buffer_config.sample_rate as f64 * PEAK_METER_DECAY_MS / 1000.0).recip())
+            as f32;
         self.sample_rate = buffer_config.sample_rate;
         self.signal
-            .resize(self.signal.len()*(self.sample_rate as usize)/44100,0.0);
+            .resize(self.signal.len() * (self.sample_rate as usize) / 44100, 0.0);
 
         true
     }
@@ -176,7 +173,6 @@ impl Plugin for VoiceMaster {
                     .store(new_peak_meter, std::sync::atomic::Ordering::Relaxed)
             }
         }
-
 
         ProcessStatus::Normal
     }
