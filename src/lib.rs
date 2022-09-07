@@ -26,6 +26,9 @@ pub struct VoiceMaster {
     signal: Vec<f32>,
     /// The block-size of the signal that is fed to the pitch tracker
     signal_index: usize,
+    pitch_val: [f32; 2],
+    previous_saw : f32,
+
 }
 
 #[derive(Params)]
@@ -53,6 +56,9 @@ impl Default for VoiceMaster {
             sample_rate: 0.0,
             signal: vec![0.0; 2048],
             signal_index: 0,
+            pitch_val: [-1.0, 0.0],
+            previous_saw :  0.0,
+
         }
     }
 }
@@ -144,6 +150,7 @@ impl Plugin for VoiceMaster {
         _context: &mut impl ProcessContext,
     ) -> ProcessStatus {
         let mut channel_counter = 0;
+
         for channel_samples in buffer.iter_samples() {
             let mut amplitude = 0.0;
             let num_samples = channel_samples.len();
@@ -161,8 +168,26 @@ impl Plugin for VoiceMaster {
                     if self.signal_index == self.signal.len() {
                         self.signal_index = 0;
                         // call the pitchtracker
-                        pitch::pitch(self.sample_rate, &self.signal);
+                        self.pitch_val = pitch::pitch(self.sample_rate, &self.signal);
+                        nih_trace!(
+                            "Sample Rate: {}, Frequency: {}, Clarity: {}",
+                            self.sample_rate, self.pitch_val[0], self.pitch_val[1]
+                        );
+
+
                     }
+                }
+                match channel_counter {
+                    // 0 => *sample = audio,
+                    1 => // saw at 1/4 freq
+                    {
+                        *sample = self.previous_saw+(self.pitch_val[0]/(self.sample_rate*4.0));
+                        *sample -= (*sample).floor();
+                        self.previous_saw = *sample
+                    },
+                    2 => // clarity:
+                        *sample = self.pitch_val[1],
+                    _ => (),
                 }
                 // next channel
                 channel_counter = (channel_counter + 1) % Self::DEFAULT_OUTPUT_CHANNELS;

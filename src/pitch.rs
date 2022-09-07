@@ -1,8 +1,7 @@
 use pitch_detection::detector::mcleod::McLeodDetector;
 use pitch_detection::detector::PitchDetector;
-use nih_plug::nih_trace;
 
-pub(crate) fn pitch(sample_rate: f32, signal: &Vec<f32>) {
+pub(crate) fn pitch(sample_rate: f32, signal: &Vec<f32>) -> [f32; 2] {
     // Include only notes that exceed a power threshold which relates to the
     // amplitude of frequencies in the signal. Use the suggested default
     // value of 5.0 from the library.
@@ -40,8 +39,5 @@ pub(crate) fn pitch(sample_rate: f32, signal: &Vec<f32>) {
         }
     };
 
-    nih_trace!(
-        "Sample Rate: {}, Frequency: {}, Clarity: {}",
-        sample_rate, pitch_val[0], pitch_val[1]
-    );
+    return pitch_val;
 }
