@@ -91,7 +91,7 @@ impl Plugin for VoiceMaster {
     const VERSION: &'static str = "0.0.1";
 
     const DEFAULT_INPUT_CHANNELS: u32 = 1;
-    const DEFAULT_OUTPUT_CHANNELS: u32 = 1;
+    const DEFAULT_OUTPUT_CHANNELS: u32 = 3;
 
     const DEFAULT_AUX_INPUTS: Option<AuxiliaryIOConfig> = None;
     const DEFAULT_AUX_OUTPUTS: Option<AuxiliaryIOConfig> = None;
@@ -115,7 +115,8 @@ impl Plugin for VoiceMaster {
 
     fn accepts_bus_config(&self, config: &BusConfig) -> bool {
         // This works with any symmetrical IO layout
-        config.num_input_channels == config.num_output_channels && config.num_input_channels > 0
+        config.num_input_channels == Self::DEFAULT_INPUT_CHANNELS &&
+            config.num_output_channels  == Self::DEFAULT_OUTPUT_CHANNELS
     }
 
     fn initialize(
@@ -142,6 +143,7 @@ impl Plugin for VoiceMaster {
         _aux: &mut AuxiliaryBuffers,
         _context: &mut impl ProcessContext,
     ) -> ProcessStatus {
+        let mut channel_counter = 0;
         for channel_samples in buffer.iter_samples() {
             let mut amplitude = 0.0;
             let num_samples = channel_samples.len();
@@ -150,13 +152,22 @@ impl Plugin for VoiceMaster {
             for sample in channel_samples {
                 *sample *= gain;
                 amplitude += *sample;
-                self.signal[self.signal_index] = *sample as f32;
-                self.signal_index += 1;
-                if self.signal_index == self.signal.len() {
-                    self.signal_index = 0;
-                    pitch::pitch(self.sample_rate, &self.signal);
+                // if we are on the first channel
+                if channel_counter == 0 {
+                    // copy our sample to signal
+                    self.signal[self.signal_index] = *sample as f32;
+                    self.signal_index += 1;
+                    // if the signal buffer is full
+                    if self.signal_index == self.signal.len() {
+                        self.signal_index = 0;
+                        // call the pitchtracker
+                        pitch::pitch(self.sample_rate, &self.signal);
+                    }
                 }
+                // next channel
+                channel_counter = (channel_counter + 1) % Self::DEFAULT_OUTPUT_CHANNELS;
             }
+
             // To save resources, a plugin can (and probably should!) only perform expensive
             // calculations that are only displayed on the GUI while the GUI is open
             if self.params.editor_state.is_open() {
@@ -196,5 +207,5 @@ impl Vst3Plugin for VoiceMaster {
     const VST3_CATEGORIES: &'static str = "Fx|Dynamics";
 }
 
-// nih_export_clap!(VoiceMaster);
-// nih_export_vst3!(VoiceMaster);
+nih_export_clap!(VoiceMaster);
+nih_export_vst3!(VoiceMaster);
