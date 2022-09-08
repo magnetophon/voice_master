@@ -26,4 +26,10 @@ nih_plug_vizia = { git = "https://github.com/robbert-vdh/nih-plug.git" }
 
 atomic_float = "0.1"
 
-pitch-detection = "0.3.0"
+# pitch-detection = "0.3.0"
+
+pitch-detection = { git = "https://github.com/magnetophon/pitch-detection.git" }
+
+# [patch]
+# [patch.'https://github.com/magnetophon/pitch-detection']
+# pitch-detection = { path = "../pitch-detection" }

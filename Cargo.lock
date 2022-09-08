@@ -66,8 +66,10 @@ checksum = "b9a8f622bcf6ff3df478e9deba3e03e4e04b300f8e6a139e192c05fa3490afc7"
 [[package]]
 name = "assert_no_alloc"
 version = "1.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55ca83137a482d61d916ceb1eba52a684f98004f18e0cafea230fe5579c178a3"
+source = "git+https://github.com/robbert-vdh/rust-assert-no-alloc.git?branch=nih-plug#95120d996240a2c279a6067502e11b62d30563a6"
+dependencies = [
+ "backtrace",
+]
 
 [[package]]
 name = "atomic_float"
@@ -1322,7 +1324,7 @@ dependencies = [
 [[package]]
 name = "nih_plug"
 version = "0.0.0"
-source = "git+https://github.com/robbert-vdh/nih-plug.git#910a90d47a56c7795b6071d2548366ded6b593bb"
+source = "git+https://github.com/robbert-vdh/nih-plug.git#4c9a2726f35e56bf009c300736f486844fe23469"
 dependencies = [
  "anyhow",
  "assert_no_alloc",
@@ -1362,7 +1364,7 @@ source = "git+https://github.com/robbert-vdh/nih_plug_assets.git#a04e327923e120b
 [[package]]
 name = "nih_plug_derive"
 version = "0.1.0"
-source = "git+https://github.com/robbert-vdh/nih-plug.git#910a90d47a56c7795b6071d2548366ded6b593bb"
+source = "git+https://github.com/robbert-vdh/nih-plug.git#4c9a2726f35e56bf009c300736f486844fe23469"
 dependencies = [
  "quote",
  "syn",
@@ -1371,7 +1373,7 @@ dependencies = [
 [[package]]
 name = "nih_plug_vizia"
 version = "0.0.0"
-source = "git+https://github.com/robbert-vdh/nih-plug.git#910a90d47a56c7795b6071d2548366ded6b593bb"
+source = "git+https://github.com/robbert-vdh/nih-plug.git#4c9a2726f35e56bf009c300736f486844fe23469"
 dependencies = [
  "baseview",
  "crossbeam",
@@ -1384,7 +1386,7 @@ dependencies = [
 [[package]]
 name = "nih_plug_xtask"
 version = "0.1.0"
-source = "git+https://github.com/robbert-vdh/nih-plug.git#910a90d47a56c7795b6071d2548366ded6b593bb"
+source = "git+https://github.com/robbert-vdh/nih-plug.git#4c9a2726f35e56bf009c300736f486844fe23469"
 dependencies = [
  "anyhow",
  "goblin",
@@ -1670,9 +1672,9 @@ checksum = "19b17cddbe7ec3f8bc800887bab5e717348c95ea2ca0b1bf0837fb964dc67099"
 
 [[package]]
 name = "percent-encoding"
-version = "2.1.0"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4fd5641d01c8f18a23da7b6fe29298ff4b55afcccdf78973b24cf3175fee32e"
+checksum = "478c572c3d73181ff3c2539045f6eb99e5491218eae919370993b890cdbdd98e"
 
 [[package]]
 name = "phf"
@@ -1721,8 +1723,7 @@ dependencies = [
 [[package]]
 name = "pitch-detection"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e086e70dfcfd46cd6097c501a66fb07cd73ee8c27844b0941d9b2b3e43dfbf92"
+source = "git+https://github.com/magnetophon/pitch-detection.git#a3243f18f82bf628470d09fd760d5b77fced1a02"
 dependencies = [
  "rustfft",
 ]
