@@ -158,10 +158,10 @@ impl Plugin for VoiceMaster {
 
             let gain = self.params.gain.smoothed.next();
             for sample in channel_samples {
-                *sample *= gain;
-                amplitude += *sample;
                 // if we are on the first channel
                 if channel_counter == 0 {
+                    *sample *= gain;
+                    amplitude += *sample;
                     // copy our sample to signal
                     self.signal[self.signal_index] = *sample as f32;
                     self.signal_index += 1;
