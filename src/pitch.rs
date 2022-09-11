@@ -2,7 +2,8 @@ use pitch_detection::detector::mcleod::McLeodDetector;
 use pitch_detection::detector::PitchDetector;
 use pitch_detection::detector::internals::Pitch;
 
-pub(crate) fn pitch(sample_rate: f32, signal: &Vec<f32>, optional_pitch: &mut Option<Pitch<f32>>, mut pitch_val: [f32; 2], detector: &mut McLeodDetector<f32>) -> [f32; 2] {
+// pub(crate) fn pitch(sample_rate: f32, signal: &Vec<f32>, optional_pitch: &mut Option<Pitch<f32>>, mut pitch_val: [f32; 2], detector: &mut McLeodDetector<f32>) -> [f32; 2] {
+pub(crate) fn pitch(sample_rate: f32, signal: &Vec<f32>, detector: &mut McLeodDetector<f32>) -> [f32; 2] {
     // pub(crate) fn pitch(sample_rate: f32, signal: &Vec<f32>) -> [f32; 2] {
     // Include only notes that exceed a power threshold which relates to the
     // amplitude of frequencies in the signal. Use the suggested default
@@ -23,14 +24,14 @@ pub(crate) fn pitch(sample_rate: f32, signal: &Vec<f32>, optional_pitch: &mut Op
 
 
 
-    *optional_pitch = detector.get_pitch(
+    let optional_pitch = detector.get_pitch(
         &signal,
         sample_rate as usize,
         POWER_THRESHOLD,
         CLARITY_THRESHOLD,
     );
 
-    // let mut pitch_val: [f32; 2] = [-1.0, 0.0];
+    let mut pitch_val: [f32; 2] = [-1.0, 0.0];
 
     match optional_pitch {
         Some(pit) => {

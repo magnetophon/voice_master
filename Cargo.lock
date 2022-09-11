@@ -1723,7 +1723,6 @@ dependencies = [
 [[package]]
 name = "pitch-detection"
 version = "0.3.0"
-source = "git+https://github.com/magnetophon/pitch-detection.git#a3243f18f82bf628470d09fd760d5b77fced1a02"
 dependencies = [
  "rustfft",
 ]

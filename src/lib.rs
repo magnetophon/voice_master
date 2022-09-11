@@ -3,7 +3,6 @@ use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
 use std::sync::Arc;
 use pitch_detection::detector::mcleod::McLeodDetector;
-use pitch_detection::detector::internals::Pitch;
 
 mod editor;
 mod pitch;
@@ -30,7 +29,6 @@ pub struct VoiceMaster {
     signal_index: usize,
     pitch_val: [f32; 2],
     previous_saw : f32,
-    optional_pitch: Option<Pitch<f32>>,
     detector : McLeodDetector<f32>,
 }
 
@@ -61,7 +59,6 @@ impl Default for VoiceMaster {
             signal_index: 0,
             pitch_val: [-1.0, 0.0],
             previous_saw :  0.0,
-            optional_pitch : None::<Pitch<f32>>,
             detector : McLeodDetector::new(2048, 1024),
         }
     }
@@ -173,7 +170,8 @@ impl Plugin for VoiceMaster {
                         self.signal_index = 0;
                         // call the pitchtracker
                         // self.pitch_val = pitch::pitch(self.sample_rate, &self.signal);
-                        self.pitch_val = pitch::pitch(self.sample_rate, &self.signal, &mut self.optional_pitch, self.pitch_val, &mut self.detector);
+                        // self.pitch_val = pitch::pitch(self.sample_rate, &self.signal, &mut self.optional_pitch, self.pitch_val, &mut self.detector);
+                        self.pitch_val = pitch::pitch(self.sample_rate, &self.signal, &mut self.detector);
                         // nih_trace!(
                         // "Sample Rate: {}, Frequency: {}, Clarity: {}",
                         // self.sample_rate, self.pitch_val[0], self.pitch_val[1]
