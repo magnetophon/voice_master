@@ -235,5 +235,5 @@ impl Vst3Plugin for VoiceMaster {
     const VST3_CATEGORIES: &'static str = "Fx|Dynamics";
 }
 
-// nih_export_clap!(VoiceMaster);
-// nih_export_vst3!(VoiceMaster);
+nih_export_clap!(VoiceMaster);
+nih_export_vst3!(VoiceMaster);
