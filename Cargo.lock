@@ -1324,7 +1324,7 @@ dependencies = [
 [[package]]
 name = "nih_plug"
 version = "0.0.0"
-source = "git+https://github.com/robbert-vdh/nih-plug.git#4c9a2726f35e56bf009c300736f486844fe23469"
+source = "git+https://github.com/robbert-vdh/nih-plug.git#b883a611abfdd1d50b380943035facb590c3d990"
 dependencies = [
  "anyhow",
  "assert_no_alloc",
@@ -1364,7 +1364,7 @@ source = "git+https://github.com/robbert-vdh/nih_plug_assets.git#a04e327923e120b
 [[package]]
 name = "nih_plug_derive"
 version = "0.1.0"
-source = "git+https://github.com/robbert-vdh/nih-plug.git#4c9a2726f35e56bf009c300736f486844fe23469"
+source = "git+https://github.com/robbert-vdh/nih-plug.git#b883a611abfdd1d50b380943035facb590c3d990"
 dependencies = [
  "quote",
  "syn",
@@ -1373,7 +1373,7 @@ dependencies = [
 [[package]]
 name = "nih_plug_vizia"
 version = "0.0.0"
-source = "git+https://github.com/robbert-vdh/nih-plug.git#4c9a2726f35e56bf009c300736f486844fe23469"
+source = "git+https://github.com/robbert-vdh/nih-plug.git#b883a611abfdd1d50b380943035facb590c3d990"
 dependencies = [
  "baseview",
  "crossbeam",
@@ -1386,7 +1386,7 @@ dependencies = [
 [[package]]
 name = "nih_plug_xtask"
 version = "0.1.0"
-source = "git+https://github.com/robbert-vdh/nih-plug.git#4c9a2726f35e56bf009c300736f486844fe23469"
+source = "git+https://github.com/robbert-vdh/nih-plug.git#b883a611abfdd1d50b380943035facb590c3d990"
 dependencies = [
  "anyhow",
  "goblin",
@@ -1723,6 +1723,7 @@ dependencies = [
 [[package]]
 name = "pitch-detection"
 version = "0.3.0"
+source = "git+https://github.com/magnetophon/pitch-detection.git#53fd8c6c36c7c8f98bd8abf423bd58915dbb0346"
 dependencies = [
  "rustfft",
 ]

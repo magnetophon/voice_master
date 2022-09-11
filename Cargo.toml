@@ -30,6 +30,6 @@ atomic_float = "0.1"
 
 pitch-detection = { git = "https://github.com/magnetophon/pitch-detection.git" }
 
-[patch]
-[patch.'https://github.com/magnetophon/pitch-detection']
-pitch-detection = { path = "../pitch-detection" }
+# [patch]
+# [patch.'https://github.com/magnetophon/pitch-detection']
+# pitch-detection = { path = "../pitch-detection" }
