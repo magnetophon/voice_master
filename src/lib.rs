@@ -1,8 +1,8 @@
 use atomic_float::AtomicF32;
 use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
-use std::sync::Arc;
 use pitch_detection::detector::mcleod::McLeodDetector;
+use std::sync::Arc;
 
 mod editor;
 mod pitch;
@@ -28,8 +28,8 @@ pub struct VoiceMaster {
     /// The block-size of the signal that is fed to the pitch tracker
     signal_index: usize,
     pitch_val: [f32; 2],
-    previous_saw : f32,
-    detector : McLeodDetector<f32>,
+    previous_saw: f32,
+    detector: McLeodDetector<f32>,
 }
 
 #[derive(Params)]
@@ -58,8 +58,8 @@ impl Default for VoiceMaster {
             signal: vec![0.0; 2048],
             signal_index: 0,
             pitch_val: [-1.0, 0.0],
-            previous_saw :  0.0,
-            detector : McLeodDetector::new(2048, 1024),
+            previous_saw: 0.0,
+            detector: McLeodDetector::new(2048, 1024),
         }
     }
 }
@@ -122,8 +122,8 @@ impl Plugin for VoiceMaster {
 
     fn accepts_bus_config(&self, config: &BusConfig) -> bool {
         // This works with any symmetrical IO layout
-        config.num_input_channels == Self::DEFAULT_INPUT_CHANNELS &&
-            config.num_output_channels  == Self::DEFAULT_OUTPUT_CHANNELS
+        config.num_input_channels == Self::DEFAULT_INPUT_CHANNELS
+            && config.num_output_channels == Self::DEFAULT_OUTPUT_CHANNELS
     }
 
     fn initialize(
@@ -169,27 +169,29 @@ impl Plugin for VoiceMaster {
                     if self.signal_index == self.signal.len() {
                         self.signal_index = 0;
                         // call the pitchtracker
-                        // self.pitch_val = pitch::pitch(self.sample_rate, &self.signal);
-                        // self.pitch_val = pitch::pitch(self.sample_rate, &self.signal, &mut self.optional_pitch, self.pitch_val, &mut self.detector);
-                        self.pitch_val = pitch::pitch(self.sample_rate, &self.signal, &mut self.detector);
+                        self.pitch_val =
+                            pitch::pitch(self.sample_rate, &self.signal, &mut self.detector);
                         // nih_trace!(
                         // "Sample Rate: {}, Frequency: {}, Clarity: {}",
                         // self.sample_rate, self.pitch_val[0], self.pitch_val[1]
                         // );
-
-
                     }
                 }
                 match channel_counter {
                     // 0 => audio,
-                    1 => // positive saw at 1/4 freq, see https://github.com/magnetophon/VoiceOfFaust/blob/V1.1.4/lib/master.lib#L8
+                    1 =>
+                    // positive saw at 1/4 freq, see https://github.com/magnetophon/VoiceOfFaust/blob/V1.1.4/lib/master.lib#L8
                     {
-                        *sample = self.previous_saw+(self.pitch_val[0]/(self.sample_rate*4.0));
+                        *sample =
+                            self.previous_saw + (self.pitch_val[0] / (self.sample_rate * 4.0));
                         *sample -= (*sample).floor();
                         self.previous_saw = *sample
-                    },
-                    2 => // clarity:
-                        *sample = self.pitch_val[1],
+                    }
+                    2 =>
+                    // clarity:
+                    {
+                        *sample = self.pitch_val[1]
+                    }
                     _ => (),
                 }
                 // next channel
