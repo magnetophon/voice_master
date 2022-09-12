@@ -107,7 +107,7 @@ impl Default for VoiceMasterParams {
 
             power_threshold: FloatParam::new(
                 "Power Threshold",
-                3.0,
+                5.0,
                 FloatRange::Linear {
                     min: 0.0,
                     max: 10.0,
@@ -115,7 +115,7 @@ impl Default for VoiceMasterParams {
             ),
             clarity_threshold: FloatParam::new(
                 "Clarity Threshold",
-                0.7,
+                0.6,
                 FloatRange::Linear { min: 0.0, max: 1.0 },
             ),
             // pick_threshold: FloatParam::new(
@@ -125,11 +125,11 @@ impl Default for VoiceMasterParams {
             // ),
             pick_threshold: FloatParam::new(
                 "Pick Threshold",
-                0.98,
+                0.99,
                 FloatRange::Skewed {
-                    min: 0.0,
+                    min: 0.96,
                     max: 1.0,
-                    factor: FloatRange::skew_factor(5.0),
+                    factor: FloatRange::skew_factor(2.0),
                 },
             ),
         }
@@ -222,8 +222,7 @@ impl Plugin for VoiceMaster {
                                 &self.signal,
                                 &mut self.detector,
                                 self.params.power_threshold.value(),
-                                //self.params.clarity_threshold.value(),
-                                // clarity_threshold:
+                                // clarity_threshold: use 0.0, so all pitch values are let trough
                                 0.0,
                                 self.params.pick_threshold.value(),
                                 // self.params.pick_threshold.value()*0.05+0.95,
