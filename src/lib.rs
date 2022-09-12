@@ -187,6 +187,7 @@ impl Plugin for VoiceMaster {
                     }
                     // clarity:
                     2 => *sample = self.pitch_val[1],
+                    // never happens:
                     _ => (),
                 }
                 // next channel
