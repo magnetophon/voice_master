@@ -10,6 +10,9 @@ mod pitch;
 /// The time it takes for the peak meter to decay by 12 dB after switching to complete silence.
 const PEAK_METER_DECAY_MS: f64 = 150.0;
 
+const DETECTOR_SIZE: usize = 1024;
+const DETECTOR_PADDING: usize = DETECTOR_SIZE/2;
+
 /// This is mostly identical to the gain example, minus some fluff, and with a GUI.
 pub struct VoiceMaster {
     params: Arc<VoiceMasterParams>,
@@ -73,12 +76,12 @@ impl Default for VoiceMaster {
             peak_meter_decay_weight: 1.0,
             peak_meter: Arc::new(AtomicF32::new(util::MINUS_INFINITY_DB)),
             sample_rate: 0.0,
-            signal: vec![0.0; 2048],
+            signal: vec![0.0; DETECTOR_SIZE],
             signal_index: 0,
             pitch_val: [-1.0, 0.0],
             previous_saw: 0.0,
             pitch_held: 0.0,
-            detector: McLeodDetector::new(2048, 1024),
+            detector: McLeodDetector::new(DETECTOR_SIZE, DETECTOR_PADDING),
         }
     }
 }
@@ -186,7 +189,7 @@ impl Plugin for VoiceMaster {
             as f32;
         self.sample_rate = buffer_config.sample_rate;
         self.signal
-            .resize(self.signal.len() * (self.sample_rate as usize) / 44100, 0.0);
+            .resize(self.signal.len() * (self.sample_rate as usize) / 48000, 0.0);
 
         true
     }
