@@ -236,11 +236,12 @@ impl Plugin for VoiceMaster {
                     }
                     // positive saw at 1/4 freq, see https://github.com/magnetophon/VoiceOfFaust/blob/V1.1.4/lib/master.lib#L8
                     1 => {
-                        if self.pitch_val[1] > self.params.clarity_threshold.value() && self.pitch_val[0] != -1.0 {
+                        if self.pitch_val[1] > self.params.clarity_threshold.value()
+                            && self.pitch_val[0] != -1.0
+                        {
                             self.pitch_held = self.pitch_val[0];
                         }
-                        *sample =
-                            self.previous_saw + (self.pitch_held / (self.sample_rate * 4.0));
+                        *sample = self.previous_saw + (self.pitch_held / (self.sample_rate * 4.0));
                         *sample -= (*sample).floor();
                         self.previous_saw = *sample
                     }
