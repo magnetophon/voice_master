@@ -29,6 +29,7 @@ pub struct VoiceMaster {
     signal_index: usize,
     pitch_val: [f32; 2],
     previous_saw: f32,
+    pitch_held: f32,
     detector: McLeodDetector<f32>,
 }
 
@@ -45,6 +46,23 @@ struct VoiceMasterParams {
 
     #[id = "gain"]
     pub gain: FloatParam,
+
+    // pub(crate) fn pitch(sample_rate: f32, signal: &Vec<f32>) -> [f32; 2] {
+    // Include only notes that exceed a power threshold which relates to the
+    // amplitude of frequencies in the signal. Use the suggested default
+    // value of 5.0 from the library.
+    #[id = "power_threshold"]
+    pub power_threshold: FloatParam,
+    // The clarity measure describes how coherent the sound of a note is. For
+    // example, the background sound in a crowded room would typically be would
+    // have low clarity and a ringing tuning fork would have high clarity.
+    // This threshold is used to accept detect notes that are clear enough
+    // (valid values are in the range 0-1).
+    #[id = "clarity_threshold"]
+    pub clarity_threshold: FloatParam,
+    // https://github.com/alesgenova/pitch-detection/issues/23#issue-1354799855
+    #[id = "pick_threshold"]
+    pub pick_threshold: FloatParam,
 }
 
 impl Default for VoiceMaster {
@@ -59,6 +77,7 @@ impl Default for VoiceMaster {
             signal_index: 0,
             pitch_val: [-1.0, 0.0],
             previous_saw: 0.0,
+            pitch_held: 0.0,
             detector: McLeodDetector::new(2048, 1024),
         }
     }
@@ -85,6 +104,34 @@ impl Default for VoiceMasterParams {
             .with_unit(" dB")
             .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
             .with_string_to_value(formatters::s2v_f32_gain_to_db()),
+
+            power_threshold: FloatParam::new(
+                "Power Threshold",
+                3.0,
+                FloatRange::Linear {
+                    min: 0.0,
+                    max: 10.0,
+                },
+            ),
+            clarity_threshold: FloatParam::new(
+                "Clarity Threshold",
+                0.7,
+                FloatRange::Linear { min: 0.0, max: 1.0 },
+            ),
+            // pick_threshold: FloatParam::new(
+            // "Pick Threshold",
+            // 0.7,
+            // FloatRange::Linear { min: 0.0, max: 1.0 },
+            // ),
+            pick_threshold: FloatParam::new(
+                "Pick Threshold",
+                0.98,
+                FloatRange::Skewed {
+                    min: 0.0,
+                    max: 1.0,
+                    factor: FloatRange::skew_factor(5.0),
+                },
+            ),
         }
     }
 }
@@ -170,8 +217,17 @@ impl Plugin for VoiceMaster {
                         if self.signal_index == self.signal.len() {
                             self.signal_index = 0;
                             // call the pitchtracker
-                            self.pitch_val =
-                                pitch::pitch(self.sample_rate, &self.signal, &mut self.detector);
+                            self.pitch_val = pitch::pitch(
+                                self.sample_rate,
+                                &self.signal,
+                                &mut self.detector,
+                                self.params.power_threshold.value(),
+                                //self.params.clarity_threshold.value(),
+                                // clarity_threshold:
+                                0.0,
+                                self.params.pick_threshold.value(),
+                                // self.params.pick_threshold.value()*0.05+0.95,
+                            );
                             // nih_trace!(
                             // "Sample Rate: {}, Frequency: {}, Clarity: {}",
                             // self.sample_rate, self.pitch_val[0], self.pitch_val[1]
@@ -180,8 +236,11 @@ impl Plugin for VoiceMaster {
                     }
                     // positive saw at 1/4 freq, see https://github.com/magnetophon/VoiceOfFaust/blob/V1.1.4/lib/master.lib#L8
                     1 => {
+                        if self.pitch_val[1] > self.params.clarity_threshold.value() && self.pitch_val[0] != -1.0 {
+                            self.pitch_held = self.pitch_val[0];
+                        }
                         *sample =
-                            self.previous_saw + (self.pitch_val[0] / (self.sample_rate * 4.0));
+                            self.previous_saw + (self.pitch_held / (self.sample_rate * 4.0));
                         *sample -= (*sample).floor();
                         self.previous_saw = *sample
                     }

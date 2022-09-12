@@ -24,7 +24,7 @@ impl Model for Data {}
 
 // Makes sense to also define this here, makes it a bit easier to keep track of
 pub(crate) fn default_state() -> Arc<ViziaState> {
-    ViziaState::from_size(200, 150)
+    ViziaState::from_size(400, 300)
 }
 
 pub(crate) fn create(
@@ -44,29 +44,25 @@ pub(crate) fn create(
         ResizeHandle::new(cx);
 
         VStack::new(cx, |cx| {
-            Label::new(cx, "VoiceMaster")
+            Label::new(cx, "Voice Master")
                 .font(assets::NOTO_SANS_THIN)
                 .font_size(40.0 * POINT_SCALE)
                 .height(Pixels(50.0))
                 .child_top(Stretch(1.0))
-                .child_bottom(Pixels(0.0));
+                .child_bottom(Pixels(0.0))
+            // Make this more or less align with the parameters column
+                .right(Pixels(67.0));
 
-            // NOTE: VIZIA adds 1 pixel of additional height to these labels, so we'll need to
-            //       compensate for that
-            Label::new(cx, "Gain").bottom(Pixels(-1.0));
-            ParamSlider::new(cx, Data::params, |params| &params.gain);
-
-            PeakMeter::new(
-                cx,
-                Data::peak_meter
-                    .map(|peak_meter| util::gain_to_db(peak_meter.load(Ordering::Relaxed))),
-                Some(Duration::from_millis(600)),
-            )
-            // This is how adding padding works in vizia
-            .top(Pixels(10.0));
+            ScrollView::new(cx, 0.0, 0.0, false, true, |cx| {
+                // This looks better if it's flush at the top, and then we'll just add some padding
+                // at the top of the scroll view
+                GenericUi::new(cx, Data::params).child_top(Pixels(0.0));
+            })
+                .width(Percentage(100.0))
+                .top(Pixels(5.0));
         })
-        .row_between(Pixels(0.0))
-        .child_left(Stretch(1.0))
-        .child_right(Stretch(1.0));
+            .row_between(Pixels(0.0))
+            .child_left(Stretch(1.0))
+            .child_right(Stretch(1.0));
     })
 }
