@@ -262,9 +262,9 @@ impl Plugin for VoiceMaster {
                                 // );
                             }
                         }
-                        // MEDIAN_NR times per signal-length
-                        for i in 0..MEDIAN_NR {
-                            if (self.signal_index + (i * (len / MEDIAN_NR))) % len == 0
+                        // OVERLAP times per signal-length
+                        for i in 0..OVERLAP {
+                            if (self.signal_index + (i * (len / OVERLAP))) % len == 0
                                 && self.pitch_val[1] > self.params.clarity_threshold.value()
                                 && self.pitch_val[0] != -1.0
                                 && self.pitch_val[0] < 440.0
