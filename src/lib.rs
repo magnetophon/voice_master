@@ -35,7 +35,6 @@ pub struct VoiceMaster {
     pitches: [f32; MEDIAN_NR],
     previous_saw: f32,
     pitch_held: f32,
-    pitch_sum: f32,
     median_index: usize,
     detector: McLeodDetector<f32>,
 }
@@ -87,7 +86,6 @@ impl Default for VoiceMaster {
             pitches: Default::default(),
             previous_saw: 0.0,
             pitch_held: 0.0,
-            pitch_sum: 0.0,
             median_index: 0,
             detector: McLeodDetector::new(2, 1),
         }
@@ -233,7 +231,6 @@ impl Plugin for VoiceMaster {
                         // if the signal buffer is full
                         if self.signal_index == len {
                             self.signal_index = 0;
-                            self.pitch_sum = 0.0;
                         };
                         for i in 0..OVERLAP {
                             // if index[i] == 0
@@ -338,5 +335,5 @@ impl Vst3Plugin for VoiceMaster {
     const VST3_CATEGORIES: &'static str = "Fx|Dynamics";
 }
 
-nih_export_clap!(VoiceMaster);
-nih_export_vst3!(VoiceMaster);
+// nih_export_clap!(VoiceMaster);
+// nih_export_vst3!(VoiceMaster);
