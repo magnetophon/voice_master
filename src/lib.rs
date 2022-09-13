@@ -10,7 +10,7 @@ mod pitch;
 /// The time it takes for the peak meter to decay by 12 dB after switching to complete silence.
 const PEAK_METER_DECAY_MS: f64 = 150.0;
 
-const DETECTOR_SIZE: usize = 1024;
+const DETECTOR_SIZE: usize = 2048;
 const OVERLAP: usize = 32;
 const MEDIAN_NR: usize = 7;
 
