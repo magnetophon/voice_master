@@ -12,7 +12,7 @@ const PEAK_METER_DECAY_MS: f64 = 150.0;
 
 const DETECTOR_SIZE: usize = 1024;
 const OVERLAP: usize = 32;
-const AVERAGE_NR: usize = 4;
+const MEDIAN_NR: usize = 7;
 
 /// This is mostly identical to the gain example, minus some fluff, and with a GUI.
 pub struct VoiceMaster {
@@ -32,11 +32,11 @@ pub struct VoiceMaster {
     /// The block-size of the signal that is fed to the pitch tracker
     signal_index: usize,
     pitch_val: [f32; 2],
-    pitches: [f32; AVERAGE_NR],
+    pitches: [f32; MEDIAN_NR],
     previous_saw: f32,
     pitch_held: f32,
     pitch_sum: f32,
-    overlap: usize,
+    median_index: usize,
     detector: McLeodDetector<f32>,
 }
 
@@ -88,7 +88,7 @@ impl Default for VoiceMaster {
             previous_saw: 0.0,
             pitch_held: 0.0,
             pitch_sum: 0.0,
-            overlap: 0,
+            median_index: 0,
             detector: McLeodDetector::new(2, 1),
         }
     }
@@ -131,7 +131,7 @@ impl Default for VoiceMasterParams {
             ),
             pick_threshold: FloatParam::new(
                 "Pick Threshold",
-                0.998,
+                0.999,
                 FloatRange::Skewed {
                     min: 0.98,
                     max: 1.0,
@@ -234,7 +234,6 @@ impl Plugin for VoiceMaster {
                         if self.signal_index == len {
                             self.signal_index = 0;
                             self.pitch_sum = 0.0;
-                            // self.overlap = 0;
                         };
                         for i in 0..OVERLAP {
                             // if index[i] == 0
@@ -254,8 +253,8 @@ impl Plugin for VoiceMaster {
                                     && self.pitch_val[0] != -1.0
                                     && self.pitch_val[0] < 440.0
                                 {
-                                    self.pitches[self.overlap] = self.pitch_val[0];
-                                    self.overlap = (self.overlap + 1) % AVERAGE_NR;
+                                    self.pitches[self.median_index] = self.pitch_val[0];
+                                    self.median_index = (self.median_index + 1) % MEDIAN_NR;
                                 }
                                 // nih_trace!(
                                 // "i: {}, Frequency: {}, Clarity: {}",
@@ -263,16 +262,18 @@ impl Plugin for VoiceMaster {
                                 // );
                             }
                         }
-                        // AVERAGE_NR times per signal-length
-                        for i in 0..AVERAGE_NR {
-                            if (self.signal_index + (i * (len / AVERAGE_NR))) % len == 0
-                            // && self.overlap == 0
+                        // MEDIAN_NR times per signal-length
+                        for i in 0..MEDIAN_NR {
+                            if (self.signal_index + (i * (len / MEDIAN_NR))) % len == 0
                                 && self.pitch_val[1] > self.params.clarity_threshold.value()
                                 && self.pitch_val[0] != -1.0
                                 && self.pitch_val[0] < 440.0
                             {
-                                self.pitch_held =
-                                    self.pitches.iter().sum::<f32>() / (AVERAGE_NR as f32);
+
+                                // self.pitches.iter().sum::<f32>() / (MEDIAN_NR as f32);
+                                self.pitches.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                                let mid = self.pitches.len() / 2;
+                                self.pitch_held  = self.pitches[mid];
                                 // println!("pitch: {}", self.pitch_held);
                             }
                         }
