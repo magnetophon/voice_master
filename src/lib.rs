@@ -12,7 +12,7 @@ const PEAK_METER_DECAY_MS: f64 = 150.0;
 
 const DETECTOR_SIZE: usize = 2048;
 const OVERLAP: usize = 32;
-const MEDIAN_NR: usize = 7;
+const MEDIAN_NR: usize = 31;
 
 /// This is mostly identical to the gain example, minus some fluff, and with a GUI.
 pub struct VoiceMaster {
@@ -126,7 +126,7 @@ impl Default for VoiceMasterParams {
             ),
             clarity_threshold: FloatParam::new(
                 "Clarity Threshold",
-                0.55,
+                0.65,
                 FloatRange::Linear { min: 0.0, max: 1.0 },
             ),
             pick_threshold: FloatParam::new(
