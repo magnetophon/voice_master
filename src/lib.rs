@@ -271,9 +271,10 @@ impl Plugin for VoiceMaster {
                             {
 
                                 // self.pitches.iter().sum::<f32>() / (MEDIAN_NR as f32);
-                                self.pitches.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                                let mid = self.pitches.len() / 2;
-                                self.pitch_held  = self.pitches[mid];
+                                let mut sorted = self.pitches;
+                                sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                                let mid = sorted.len() / 2;
+                                self.pitch_held  = sorted[mid];
                                 // println!("pitch: {}", self.pitch_held);
                             }
                         }
