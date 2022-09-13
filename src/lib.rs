@@ -124,7 +124,7 @@ impl Default for VoiceMasterParams {
             ),
             clarity_threshold: FloatParam::new(
                 "Clarity Threshold",
-                0.65,
+                0.55,
                 FloatRange::Linear { min: 0.0, max: 1.0 },
             ),
             pick_threshold: FloatParam::new(
