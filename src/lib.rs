@@ -11,7 +11,7 @@ mod pitch;
 const PEAK_METER_DECAY_MS: f64 = 150.0;
 
 const DETECTOR_SIZE: usize = 1024;
-const DETECTOR_PADDING: usize = DETECTOR_SIZE/2;
+const OVERLAP: usize = 32;
 
 /// This is mostly identical to the gain example, minus some fluff, and with a GUI.
 pub struct VoiceMaster {
@@ -27,12 +27,13 @@ pub struct VoiceMaster {
     peak_meter: Arc<AtomicF32>,
     /// sample rate
     sample_rate: f32,
-    signal: Vec<f32>,
+    signals: [Vec<f32>;OVERLAP],
     /// The block-size of the signal that is fed to the pitch tracker
     signal_index: usize,
     pitch_val: [f32; 2],
     previous_saw: f32,
     pitch_held: f32,
+    pitch_sum: f32,
     detector: McLeodDetector<f32>,
 }
 
@@ -76,12 +77,14 @@ impl Default for VoiceMaster {
             peak_meter_decay_weight: 1.0,
             peak_meter: Arc::new(AtomicF32::new(util::MINUS_INFINITY_DB)),
             sample_rate: 0.0,
-            signal: vec![0.0; DETECTOR_SIZE],
+            signals: Default::default(),
+            // signals: [vec![0.0; DETECTOR_SIZE];OVERLAP],
             signal_index: 0,
             pitch_val: [-1.0, 0.0],
             previous_saw: 0.0,
             pitch_held: 0.0,
-            detector: McLeodDetector::new(DETECTOR_SIZE, DETECTOR_PADDING),
+            pitch_sum: 0.0,
+            detector: McLeodDetector::new(2, 1),
         }
     }
 }
@@ -121,11 +124,6 @@ impl Default for VoiceMasterParams {
                 0.6,
                 FloatRange::Linear { min: 0.0, max: 1.0 },
             ),
-            // pick_threshold: FloatParam::new(
-            // "Pick Threshold",
-            // 0.7,
-            // FloatRange::Linear { min: 0.0, max: 1.0 },
-            // ),
             pick_threshold: FloatParam::new(
                 "Pick Threshold",
                 0.99,
@@ -188,9 +186,16 @@ impl Plugin for VoiceMaster {
             .powf((buffer_config.sample_rate as f64 * PEAK_METER_DECAY_MS / 1000.0).recip())
             as f32;
         self.sample_rate = buffer_config.sample_rate;
-        self.signal
-            .resize(self.signal.len() * (self.sample_rate as usize) / 48000, 0.0);
-
+        for i in 0..OVERLAP {
+            self.signals[i]
+                .resize(DETECTOR_SIZE * (self.sample_rate as usize) / 48000, 0.0);
+            // let len = self.signals[i].len();
+            // println!("len {}: {}",i,len);
+            // println!("index: {}",self.signal_index+(i*(len/OVERLAP))%len);
+        }
+        let size = self.signals[0].len();
+        let padding = size/2;
+        self.detector = McLeodDetector::new(size, padding);
         true
     }
 
@@ -201,6 +206,7 @@ impl Plugin for VoiceMaster {
         _context: &mut impl ProcessContext,
     ) -> ProcessStatus {
         let mut channel_counter = 0;
+        let len = self.signals[0].len();
 
         for channel_samples in buffer.iter_samples() {
             let mut amplitude = 0.0;
@@ -214,27 +220,47 @@ impl Plugin for VoiceMaster {
                         *sample *= gain;
                         amplitude += *sample;
                         // copy our sample to signal
-                        self.signal[self.signal_index] = *sample as f32;
+                        for i in 0..OVERLAP {
+                            self.signals[i][(self.signal_index+(i*(len/OVERLAP)))%len] = *sample as f32;
+                        }
+
                         self.signal_index += 1;
                         // if the signal buffer is full
-                        if self.signal_index == self.signal.len() {
+                        if self.signal_index == len {
                             self.signal_index = 0;
-                            // call the pitchtracker
-                            self.pitch_val = pitch::pitch(
-                                self.sample_rate,
-                                &self.signal,
-                                &mut self.detector,
-                                self.params.power_threshold.value(),
-                                // clarity_threshold: use 0.0, so all pitch values are let trough
-                                0.0,
-                                self.params.pick_threshold.value(),
-                                // self.params.pick_threshold.value()*0.05+0.95,
-                            );
-                            // nih_trace!(
-                            // "Sample Rate: {}, Frequency: {}, Clarity: {}",
-                            // self.sample_rate, self.pitch_val[0], self.pitch_val[1]
-                            // );
+                            self.pitch_sum = 0.0;
+                        };
+                        // let mut overlap = 0;
+                        for i in 0..OVERLAP {
+                            if (self.signal_index+(i*(len/OVERLAP)))%len == 0 {
+                                // call the pitchtracker
+                                self.pitch_val =
+                                    pitch::pitch(
+                                        self.sample_rate,
+                                        &self.signals[i],
+                                        &mut self.detector,
+                                        self.params.power_threshold.value(),
+                                        // clarity_threshold: use 0.0, so all pitch values are let trough
+                                        0.0,
+                                        self.params.pick_threshold.value(),
+                                        // self.params.pick_threshold.value()*0.05+0.95,
+                                    );
+                                // if self.pitch_val[1] > self.params.clarity_threshold.value()
+                                // && self.pitch_val[0] != -1.0
+                                // {
+                                // self.pitch_sum += self.pitch_val[0];
+                                // overlap += 1;
+                                // }
+                                // nih_trace!(
+                                // "i: {}, Frequency: {}, Clarity: {}",
+                                // i, self.pitch_val[0], self.pitch_val[1]
+                                // );
+                            }
                         }
+                        // if overlap > 0 {
+                        // self.pitch_val[0] = self.pitch_sum / overlap as f32;
+                        // }
+
                     }
                     // positive saw at 1/4 freq, see https://github.com/magnetophon/VoiceOfFaust/blob/V1.1.4/lib/master.lib#L8
                     1 => {
