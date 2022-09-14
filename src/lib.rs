@@ -79,6 +79,9 @@ struct VoiceMasterParams {
     // https://github.com/alesgenova/pitch-detection/issues/23#issue-1354799855
     #[id = "pick_threshold"]
     pub pick_threshold: FloatParam,
+    #[id = "max_pitch"]
+    pub max_pitch: FloatParam,
+
 }
 
 impl Default for VoiceMaster {
@@ -143,6 +146,15 @@ impl Default for VoiceMasterParams {
                     min: 0.98,
                     max: 1.0,
                     factor: FloatRange::skew_factor(3.7),
+                },
+            ),
+            max_pitch: FloatParam::new(
+                "Maximum Pitch",
+                440.0,
+                FloatRange::Skewed {
+                    min: 80.0,
+                    max: 8000.0,
+                    factor: FloatRange::skew_factor(-1.0),
                 },
             ),
         }
@@ -261,7 +273,7 @@ impl Plugin for VoiceMaster {
                                 // if clarity is high enough
                                 if self.pitch_val[1] > self.params.clarity_threshold.value()
                                 // and the pitch isn't too high
-                                    && self.pitch_val[0] < 440.0
+                                    && self.pitch_val[0] < self.params.max_pitch.value()
                                 {
                                     // update the pitches
                                     self.pitches[self.median_index] = self.pitch_val[0];
