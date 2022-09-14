@@ -31,7 +31,7 @@ pub struct VoiceMaster {
     peak_meter: Arc<AtomicF32>,
     /// sample rate
     sample_rate: f32,
-    // an array of signals to be used in the pitchtrackers
+    /// an array of signals to be used in the pitchtrackers
     signals: [Vec<f32>; OVERLAP],
     /// the sample index of the above signals
     signal_index: usize,
@@ -39,12 +39,12 @@ pub struct VoiceMaster {
     pitch_val: [f32; 2],
     /// array of pitches to pick the median from
     pitches: [f32; MEDIAN_NR],
+    /// index into "pitches", to use it as a ringbuffer
+    median_index: usize,
     /// previous value of the output saw, to calculate the new one from
     previous_saw: f32,
     /// the final pitch that we are using
-    pitch_held: f32,
-    /// which buffer are we at
-    median_index: usize,
+    final_pitch: f32,
     /// the actual pitch detector
     detector: McLeodDetector<f32>,
 }
@@ -96,9 +96,9 @@ impl Default for VoiceMaster {
             signal_index: 0,
             pitch_val: [-1.0, 0.0],
             pitches: Default::default(),
-            previous_saw: 0.0,
-            pitch_held: 0.0,
             median_index: 0,
+            previous_saw: 0.0,
+            final_pitch: 0.0,
             detector: McLeodDetector::new(2, 1),
         }
     }
@@ -291,14 +291,14 @@ impl Plugin for VoiceMaster {
                                 // sort the copy
                                 sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
                                 // get the middle one
-                                self.pitch_held = sorted[sorted.len() / 2];
-                                // nih_trace!("pitch: {}", self.pitch_held);
+                                self.final_pitch = sorted[sorted.len() / 2];
+                                // nih_trace!("pitch: {}", self.final_pitch);
                             }
                         }
                     }
                     // positive saw at 1/4 freq, see https://github.com/magnetophon/VoiceOfFaust/blob/V1.1.4/lib/master.lib#L8
                     1 => {
-                        *sample = self.previous_saw + (self.pitch_held / (self.sample_rate * 4.0));
+                        *sample = self.previous_saw + (self.final_pitch / (self.sample_rate * 4.0));
                         *sample -= (*sample).floor();
                         self.previous_saw = *sample
                     }
