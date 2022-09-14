@@ -20,9 +20,9 @@ const MIN_DETECTOR_SIZE_POWER: usize = 6;
 // 2^13 = 8192
 // 192000/8192 = 23.4Hz at a samplerate of 192k
 // for when you want to play 6 string bassguitar at 192k
-// const MAX_DETECTOR_SIZE_POWER: usize = 13;
 const MAX_DETECTOR_SIZE_POWER: usize = 13;
 const NR_OF_DETECTORS:usize = MAX_DETECTOR_SIZE_POWER-MIN_DETECTOR_SIZE_POWER+1;
+const MAX_SIZE:usize = 2_usize.pow(MAX_DETECTOR_SIZE_POWER as u32);
 /// the nr of times the detector is updated each DETECTOR_SIZE samples
 // TODO: make variable?
 const OVERLAP: usize = 32;
@@ -102,6 +102,9 @@ struct VoiceMasterParams {
     pub min_pitch: FloatParam,
     #[id = "max_pitch"]
     pub max_pitch: FloatParam,
+    #[id = "latency"]
+    pub latency: BoolParam,
+
 }
 
 impl Default for VoiceMaster {
@@ -206,6 +209,8 @@ impl Default for VoiceMasterParams {
                     factor: FloatRange::skew_factor(-1.0),
                 },
             ),
+
+            latency: BoolParam::new("latency", false),
         }
     }
 }
@@ -262,7 +267,7 @@ impl Plugin for VoiceMaster {
 
         for i in 0..OVERLAP {
             // self.signals[i].resize(DETECTOR_SIZE * (self.sample_rate as usize) / 48000, 0.0);
-            self.signals[i].resize(2_usize.pow(MAX_DETECTOR_SIZE_POWER as u32), 0.0);
+            self.signals[i].resize(MAX_SIZE, 0.0);
             // self.signals[i].resize(2^11, 0.0);
 
             // let len = self.signals[i].len();
@@ -294,7 +299,12 @@ impl Plugin for VoiceMaster {
             for i in 0..OVERLAP {
                 self.signals[i].resize(size as usize, 0.0);
             }
+        }
+
+        if self.params.latency.value() {
             context.set_latency_samples(size as u32);
+        } else {
+            context.set_latency_samples(0);
         }
 
         let len = self.signals[0].len();
@@ -316,6 +326,10 @@ impl Plugin for VoiceMaster {
                         for i in 0..OVERLAP {
                             self.signals[i][staggered_index(i,self.signal_index,len)] =
                                 *sample as f32;
+                        }
+                        // delay our sample
+                        if self.params.latency.value() {
+                            *sample = self.signals[0][(self.signal_index+1)%len];
                         }
 
                         // update the index
