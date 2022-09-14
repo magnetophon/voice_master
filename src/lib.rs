@@ -10,8 +10,11 @@ mod pitch;
 /// The time it takes for the peak meter to decay by 12 dB after switching to complete silence.
 const PEAK_METER_DECAY_MS: f64 = 150.0;
 
+/// Blocksize of the detector, determines the lowest pitch that can be detected at a given samplerate.
 const DETECTOR_SIZE: usize = 2048;
+/// the nr of times the detector is updated each DETECTOR_SIZE samples
 const OVERLAP: usize = 32;
+/// The median is taken from this nr of pitches
 const MEDIAN_NR: usize = 31;
 
 /// This is mostly identical to the gain example, minus some fluff, and with a GUI.
@@ -28,14 +31,21 @@ pub struct VoiceMaster {
     peak_meter: Arc<AtomicF32>,
     /// sample rate
     sample_rate: f32,
+    // an array of signals to be used in the pitchtrackers
     signals: [Vec<f32>; OVERLAP],
-    /// The block-size of the signal that is fed to the pitch tracker
+    /// the sample index of the above signals
     signal_index: usize,
+    /// the curent pitch and clarity
     pitch_val: [f32; 2],
+    /// array of pitches to pick the median from
     pitches: [f32; MEDIAN_NR],
+    /// previous value of the output saw, to calculate the new one from
     previous_saw: f32,
+    /// the final pitch that we are using
     pitch_held: f32,
+    /// which buffer are we at
     median_index: usize,
+    /// the actual pitch detector
     detector: McLeodDetector<f32>,
 }
 
@@ -80,7 +90,6 @@ impl Default for VoiceMaster {
             peak_meter: Arc::new(AtomicF32::new(util::MINUS_INFINITY_DB)),
             sample_rate: 0.0,
             signals: Default::default(),
-            // signals: [vec![0.0; DETECTOR_SIZE];OVERLAP],
             signal_index: 0,
             pitch_val: [-1.0, 0.0],
             pitches: Default::default(),
@@ -216,6 +225,7 @@ impl Plugin for VoiceMaster {
 
             let gain = self.params.gain.smoothed.next();
             for sample in channel_samples {
+                // which of the 3 channels are we on
                 match channel_counter {
                     // audio:
                     0 => {
@@ -227,13 +237,16 @@ impl Plugin for VoiceMaster {
                                 *sample as f32;
                         }
 
+                        // update the index
                         self.signal_index += 1;
-                        // if the signal buffer is full
                         if self.signal_index == len {
                             self.signal_index = 0;
                         };
+
+                        // do OVERLAP nr of times:
                         for i in 0..OVERLAP {
                             // if index[i] == 0
+                            // so IOW: when the buffer is full
                             if (self.signal_index + (i * (len / OVERLAP))) % len == 0 {
                                 // call the pitchtracker
                                 self.pitch_val = pitch::pitch(
@@ -245,44 +258,34 @@ impl Plugin for VoiceMaster {
                                     0.0,
                                     self.params.pick_threshold.value(),
                                 );
-                                // update the pitch sum
+                                // if clarity is high enough
                                 if self.pitch_val[1] > self.params.clarity_threshold.value()
-                                    && self.pitch_val[0] != -1.0
+                                // and the pitch isn't too high
                                     && self.pitch_val[0] < 440.0
                                 {
+                                    // update the pitches
                                     self.pitches[self.median_index] = self.pitch_val[0];
+                                    // update the ringbuf pointer
                                     self.median_index = (self.median_index + 1) % MEDIAN_NR;
                                 }
                                 // nih_trace!(
                                 // "i: {}, Frequency: {}, Clarity: {}",
                                 // i, self.pitch_val[0], self.pitch_val[1]
                                 // );
-                            }
-                        }
-                        // OVERLAP times per signal-length
-                        for i in 0..OVERLAP {
-                            if (self.signal_index + (i * (len / OVERLAP))) % len == 0
-                                && self.pitch_val[1] > self.params.clarity_threshold.value()
-                                && self.pitch_val[0] != -1.0
-                                && self.pitch_val[0] < 440.0
-                            {
 
-                                // self.pitches.iter().sum::<f32>() / (MEDIAN_NR as f32);
+                                // get the median pitch:
+                                // copy the pitches, we don't want to sort the ringbuffer
                                 let mut sorted = self.pitches;
+                                // sort the copy
                                 sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                                let mid = sorted.len() / 2;
-                                self.pitch_held  = sorted[mid];
-                                // println!("pitch: {}", self.pitch_held);
+                                // get the middle one
+                                self.pitch_held = sorted[sorted.len() / 2];
+                                // nih_trace!("pitch: {}", self.pitch_held);
                             }
                         }
                     }
                     // positive saw at 1/4 freq, see https://github.com/magnetophon/VoiceOfFaust/blob/V1.1.4/lib/master.lib#L8
                     1 => {
-                        // if self.pitch_val[1] > self.params.clarity_threshold.value()
-                        // && self.pitch_val[0] != -1.0
-                        // {
-                        // self.pitch_held = self.pitch_val[0];
-                        // }
                         *sample = self.previous_saw + (self.pitch_held / (self.sample_rate * 4.0));
                         *sample -= (*sample).floor();
                         self.previous_saw = *sample
@@ -290,7 +293,7 @@ impl Plugin for VoiceMaster {
                     // clarity:
                     2 => *sample = self.pitch_val[1],
                     // never happens:
-                    _ => (),
+                    _ => nih_trace!("Why are we here?"),
                 }
                 // next channel
                 channel_counter = (channel_counter + 1) % Self::DEFAULT_OUTPUT_CHANNELS;
@@ -335,5 +338,5 @@ impl Vst3Plugin for VoiceMaster {
     const VST3_CATEGORIES: &'static str = "Fx|Dynamics";
 }
 
-// nih_export_clap!(VoiceMaster);
-// nih_export_vst3!(VoiceMaster);
+nih_export_clap!(VoiceMaster);
+nih_export_vst3!(VoiceMaster);
