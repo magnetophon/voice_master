@@ -11,10 +11,14 @@ mod pitch;
 const PEAK_METER_DECAY_MS: f64 = 150.0;
 
 /// Blocksize of the detector, determines the lowest pitch that can be detected at a given samplerate.
+// TODO: make variable
+// TODO: make switchable delay and latency compensation
 const DETECTOR_SIZE: usize = 2048;
 /// the nr of times the detector is updated each DETECTOR_SIZE samples
+// TODO: make variable?
 const OVERLAP: usize = 32;
 /// The median is taken from this nr of pitches
+// TODO: make variable
 const MEDIAN_NR: usize = 31;
 
 /// This is mostly identical to the gain example, minus some fluff, and with a GUI.
@@ -79,6 +83,8 @@ struct VoiceMasterParams {
     // https://github.com/alesgenova/pitch-detection/issues/23#issue-1354799855
     #[id = "pick_threshold"]
     pub pick_threshold: FloatParam,
+    // TODO: add learn function?
+    // TODO: use note names?
     #[id = "min_pitch"]
     pub min_pitch: FloatParam,
     #[id = "max_pitch"]
