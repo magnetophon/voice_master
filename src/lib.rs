@@ -247,6 +247,7 @@ impl Plugin for VoiceMaster {
         let mut channel_counter = 0;
         let len = self.signals[0].len();
 
+
         for channel_samples in buffer.iter_samples() {
             let mut amplitude = 0.0;
             let num_samples = channel_samples.len();
@@ -261,7 +262,7 @@ impl Plugin for VoiceMaster {
                         amplitude += *sample;
                         // copy our sample to signal
                         for i in 0..OVERLAP {
-                            self.signals[i][(self.signal_index + (i * (len / OVERLAP))) % len] =
+                            self.signals[i][staggered_index(i,self.signal_index,len)] =
                                 *sample as f32;
                         }
 
@@ -275,7 +276,7 @@ impl Plugin for VoiceMaster {
                         for i in 0..OVERLAP {
                             // if index[i] == 0
                             // so IOW: when the buffer is full
-                            if (self.signal_index + (i * (len / OVERLAP))) % len == 0 {
+                            if staggered_index(i,self.signal_index,len) == 0 {
                                 // call the pitchtracker
                                 self.pitch_val = pitch::pitch(
                                     self.sample_rate,
@@ -343,6 +344,10 @@ impl Plugin for VoiceMaster {
                 self.peak_meter
                     .store(new_peak_meter, std::sync::atomic::Ordering::Relaxed)
             }
+        }
+
+        fn staggered_index(i:usize,index:usize,len:usize) -> usize {
+            (index + (i * (len / OVERLAP))) % len
         }
 
         ProcessStatus::Normal
