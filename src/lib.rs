@@ -111,7 +111,7 @@ struct VoiceMasterParams {
     #[id = "max_change"]
     pub max_change: FloatParam,
     #[id = "change_compression"]
-    pub change_compression: IntParam,
+    pub change_compression: FloatParam,
     #[id = "latency"]
     pub latency: BoolParam,
 }
@@ -242,7 +242,7 @@ impl Default for VoiceMasterParams {
 
             ok_change: FloatParam::new(
                 "OK Change Rate",
-                0.0,
+                0.42,
                 FloatRange::Skewed {
                     min: 0.0,
                     max: 2.0,
@@ -258,12 +258,13 @@ impl Default for VoiceMasterParams {
                     factor: FloatRange::skew_factor(-1.0),
                 },
             ),
-            change_compression: IntParam::new(
+            change_compression: FloatParam::new(
                 "Change Compression",
-                100,
-                IntRange::Linear {
-                    min: 1 as i32,
-                    max: 100 as i32,
+                0.03,
+                FloatRange::Skewed {
+                    min: 0.0,
+                    max: 1.0,
+                    factor: FloatRange::skew_factor(-1.0),
                 },
             ),
             latency: BoolParam::new("Latency", true),
@@ -431,7 +432,6 @@ impl Plugin for VoiceMaster {
                                     // let sign = if ratio > 1.0 { 1.0 } else { -1.0 };
                                     let sign = ratio > 1.0;
                                     let sp = ((change - self.params.ok_change.value())
-                                        * 0.01
                                         * self.params.change_compression.value() as f32)
                                         + self.params.ok_change.value();
                                     let ratioo = if sign {
@@ -442,18 +442,6 @@ impl Plugin for VoiceMaster {
                                         // .max(0.0-self.params.max_change.value())
                                     };
 
-                                    if (ratio - ratioo).abs() > 0.05 {
-                                        println!(
-                                            "ratio: {} change: {} change-max: {} sign: {} sp: {} ratioo: {}",
-                                            ratio,
-                                            change,
-                                            change - self.params.ok_change.value()
-                                                ,
-                                            sign,
-                                            sp,
-                                            ratioo,
-                                        );
-                                    };
 
                                     if change > self.params.ok_change.value() {
                                         // update the pitches
@@ -462,6 +450,19 @@ impl Plugin for VoiceMaster {
                                         // (ratioo) * self.pitch_val[0];
                                             self.previous_pitch / ratioo;
                                         // self.previous_pitch = self.pitch_val[0];
+                                        if (ratio - ratioo).abs() > 0.05 {
+                                            println!(
+                                                "ratio: {} change: {} change-max: {} sign: {} sp: {} ratioo: {}",
+                                                ratio,
+                                                change,
+                                                change - self.params.ok_change.value()
+                                                    ,
+                                                sign,
+                                                sp,
+                                                ratioo,
+                                            );
+                                        };
+
                                     } else {
                                         // update the pitches
                                         self.pitches[self.median_index] = self.pitch_val[0];
