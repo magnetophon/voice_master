@@ -27,6 +27,7 @@ const MAX_SIZE:usize = 2_usize.pow(MAX_DETECTOR_SIZE_POWER as u32);
 const OVERLAP: usize = 32;
 /// The median is taken from at max this nr of pitches
 const MAX_MEDIAN_NR: usize = OVERLAP;
+const MEDIAN_NR_DEFAULT: i32 = 7;
 
 /// This is mostly identical to the gain example, minus some fluff, and with a GUI.
 pub struct VoiceMaster {
@@ -197,7 +198,7 @@ impl Default for VoiceMasterParams {
             ),
             median_nr: IntParam::new(
                 "Median Number",
-                31,
+                MEDIAN_NR_DEFAULT,
                 IntRange::Linear {
                     min: 1 as i32,
                     max: MAX_MEDIAN_NR as i32,
@@ -231,7 +232,7 @@ impl Default for VoiceMasterParams {
             )
                 .with_unit(" Hz"),
 
-            latency: BoolParam::new("Latency", false),
+            latency: BoolParam::new("Latency", true),
         }
     }
 }
