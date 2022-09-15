@@ -265,14 +265,9 @@ impl Plugin for VoiceMaster {
             as f32;
         self.sample_rate = buffer_config.sample_rate;
 
+        // init all signals with the max size
         for i in 0..OVERLAP {
-            // self.signals[i].resize(DETECTOR_SIZE * (self.sample_rate as usize) / 48000, 0.0);
             self.signals[i].resize(MAX_SIZE, 0.0);
-            // self.signals[i].resize(2^11, 0.0);
-
-            // let len = self.signals[i].len();
-            // println!("len {}: {}",i,len);
-            // println!("index: {}",self.signal_index+(i*(len/OVERLAP))%len);
         }
         for i in 0..NR_OF_DETECTORS {
             // let size = 2^i;
@@ -327,8 +322,9 @@ impl Plugin for VoiceMaster {
                             self.signals[i][staggered_index(i,self.signal_index,len)] =
                                 *sample as f32;
                         }
-                        // delay our sample
+                        // if the user coosec to sync up the audio with the pitch
                         if self.params.latency.value() {
+                            // delay our sample
                             *sample = self.signals[0][(self.signal_index+1)%len];
                         }
 
