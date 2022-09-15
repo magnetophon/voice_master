@@ -11,8 +11,6 @@ mod pitch;
 const PEAK_METER_DECAY_MS: f64 = 150.0;
 
 /// Blocksize of the detector, determines the lowest pitch that can be detected at a given samplerate.
-// TODO: make variable
-// TODO: make switchable delay and latency compensation
 // 2^6 = 64 samples
 // 44100/64 = 689 Hz at a samplerate of 44.1k
 // for when you want to track your picolo flute with really low latency!
@@ -21,6 +19,7 @@ const MIN_DETECTOR_SIZE_POWER: usize = 6;
 // 192000/8192 = 23.4Hz at a samplerate of 192k
 // for when you want to play 6 string bassguitar at 192k
 const MAX_DETECTOR_SIZE_POWER: usize = 13;
+/// the number of detectors we need, one for each size
 const NR_OF_DETECTORS:usize = MAX_DETECTOR_SIZE_POWER-MIN_DETECTOR_SIZE_POWER+1;
 const MAX_SIZE:usize = 2_usize.pow(MAX_DETECTOR_SIZE_POWER as u32);
 /// the nr of times the detector is updated each DETECTOR_SIZE samples
@@ -162,12 +161,27 @@ impl Default for VoiceMasterParams {
 
             detector_size: IntParam::new(
                 "Detector Size",
-                5,
+                11,
                 IntRange::Linear {
-                    min: 0,
-                    max: (NR_OF_DETECTORS - 1) as i32,
+                    min: MIN_DETECTOR_SIZE_POWER as i32,
+                    max: MAX_DETECTOR_SIZE_POWER as i32,
                 },
-            ),
+            )
+                .with_unit(" samples")
+                .with_value_to_string(formatters::v2s_i32_power_of_two())
+                .with_string_to_value(formatters::s2v_i32_power_of_two()),
+
+
+            // window_size_order: IntParam::new(
+            // "Window Size",
+            // DEFAULT_WINDOW_ORDER as i32,
+            // IntRange::Linear {
+            // min: MIN_WINDOW_ORDER as i32,
+            // max: MAX_WINDOW_ORDER as i32,
+            // },
+            // )
+            // .with_value_to_string(formatters::v2s_i32_power_of_two())
+            // .with_string_to_value(formatters::s2v_i32_power_of_two()),
 
             power_threshold: FloatParam::new(
                 "Power Threshold",
@@ -193,19 +207,25 @@ impl Default for VoiceMasterParams {
             ),
             min_pitch: FloatParam::new(
                 "Minimum Pitch",
-                80.0,
+                // A2, min male vocal pitch
+                82.407,
                 FloatRange::Skewed {
-                    min: 40.0,
-                    max: 4000.0,
+                    // A0:
+                    min: 27.5,
+                    // D5, min of picolo flute
+                    max: 	587.33,
                     factor: FloatRange::skew_factor(-1.0),
                 },
             ),
             max_pitch: FloatParam::new(
                 "Maximum Pitch",
+                // A4, max male vocal pitch
                 440.0,
                 FloatRange::Skewed {
-                    min: 80.0,
-                    max: 8000.0,
+                    // A2
+                    min: 82.407,
+                    // C8, max of picolo flute
+                    max: 4186.0,
                     factor: FloatRange::skew_factor(-1.0),
                 },
             ),
@@ -287,7 +307,7 @@ impl Plugin for VoiceMaster {
     ) -> ProcessStatus {
         let mut channel_counter = 0;
         let size = 2_usize.pow(
-            (MIN_DETECTOR_SIZE_POWER + self.params.detector_size.value() as usize)
+            (self.params.detector_size.value() as usize)
                 as u32);
 
         if self.signals[0].len() != size {
@@ -344,7 +364,7 @@ impl Plugin for VoiceMaster {
                                     self.sample_rate,
                                     &self.signals[i],
                                     // &mut self.detectors[MAX_DETECTOR_SIZE_POWER-MIN_DETECTOR_SIZE_POWER-1],
-                                    &mut self.detectors[self.params.detector_size.value() as usize],
+                                    &mut self.detectors[(self.params.detector_size.value() as usize - MIN_DETECTOR_SIZE_POWER)],
                                     // detector,
                                     self.params.power_threshold.value(),
                                     // clarity_threshold: use 0.0, so all pitch values are let trough
