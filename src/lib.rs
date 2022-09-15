@@ -57,8 +57,6 @@ pub struct VoiceMaster {
     previous_saw: f32,
     /// previous value of the raw pitch detector, to calculate the change rate from
     previous_pitch: f32,
-    /// the number of times the change was too big
-    change_counter: i32,
     /// the final pitch that we are using
     final_pitch: f32,
     /// an array of pitch detectors, one for each size:
@@ -108,10 +106,12 @@ struct VoiceMasterParams {
     pub min_pitch: FloatParam,
     #[id = "max_pitch"]
     pub max_pitch: FloatParam,
+    #[id = "ok_change"]
+    pub ok_change: FloatParam,
     #[id = "max_change"]
     pub max_change: FloatParam,
-    #[id = "max_change_count"]
-    pub max_change_count: IntParam,
+    #[id = "change_compression"]
+    pub change_compression: IntParam,
     #[id = "latency"]
     pub latency: BoolParam,
 }
@@ -131,7 +131,6 @@ impl Default for VoiceMaster {
             median_index: 0,
             previous_saw: 0.0,
             previous_pitch: -1.0,
-            change_counter: 0,
             final_pitch: 0.0,
             // they wil get the real size later
             // detectors: [McLeodDetector::new(2, 1);NR_OF_DETECTORS],
@@ -241,18 +240,27 @@ impl Default for VoiceMasterParams {
             )
             .with_unit(" Hz"),
 
-            max_change: FloatParam::new(
-                "Maximum Change Rate",
-                0.8,
+            ok_change: FloatParam::new(
+                "OK Change Rate",
+                0.42,
                 FloatRange::Skewed {
                     min: 0.0,
                     max: 2.0,
                     factor: FloatRange::skew_factor(0.0),
                 },
             ),
-            max_change_count: IntParam::new(
-                "Maximum Change Count",
-                100,
+            max_change: FloatParam::new(
+                "max Change Rate",
+                1.0,
+                FloatRange::Skewed {
+                    min: 0.0,
+                    max: 2.0,
+                    factor: FloatRange::skew_factor(0.0),
+                },
+            ),
+            change_compression: IntParam::new(
+                "Change Compression",
+                87,
                 IntRange::Linear {
                     min: 1 as i32,
                     max: 100 as i32,
@@ -423,38 +431,36 @@ impl Plugin for VoiceMaster {
                                     // let sign = if ratio > 1.0 { 1.0 } else { -1.0 };
                                     let sign = ratio > 1.0;
                                     let sp = (((change
-                                                - self.params.max_change.value())
+                                                - self.params.ok_change.value())
                                                * 0.01
-                                               * self.params.max_change_count.value() as f32
+                                               * self.params.change_compression.value() as f32
                                     )
-                                    )+ self.params.max_change.value();
+                                    )+ self.params.ok_change.value();
                                     let ratioo = if sign
-                                    { 1.0+ sp }
-                                    else { 1.0 - sp };
+                                    { (1.0+ sp).min(1.0+self.params.max_change.value()) }
+                                    else { (1.0 - sp)
+                                            .max(1.0-self.params.max_change.value())
+                                    };
 
-                                    if change > self.params.max_change.value()
-                                    // && self.change_counter < self.params.max_change_count.value()
+                                    if change > self.params.ok_change.value()
                                     {
                                         println!(
                                             "ratio: {} change: {} change-max: {} sign: {} sp: {} ratioo: {}",
                                             ratio,
                                             change,
-                                            change - self.params.max_change.value()
+                                            change - self.params.ok_change.value()
                                                 ,
                                             sign,
                                             sp,
                                             ratioo,
                                         );
-                                        // self.change_counter = 0;
                                         // self.previous_pitch = self.pitch_val[0];
                                         // update the pitches
 
                                         self.pitches[self.median_index] =
                                         // (ratioo) * self.pitch_val[0];
                                             self.previous_pitch / ratioo;
-                                        // self.change_counter +=1;
                                     } else {
-                                        // self.change_counter = 0;
                                         self.previous_pitch = self.pitch_val[0];
                                         // update the pitches
                                         self.pitches[self.median_index] = self.pitch_val[0];
