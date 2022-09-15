@@ -25,9 +25,8 @@ const MAX_SIZE:usize = 2_usize.pow(MAX_DETECTOR_SIZE_POWER as u32);
 /// the nr of times the detector is updated each DETECTOR_SIZE samples
 // TODO: make variable?
 const OVERLAP: usize = 32;
-/// The median is taken from this nr of pitches
-// TODO: make variable
-const MEDIAN_NR: usize = 31;
+/// The median is taken from at max this nr of pitches
+const MAX_MEDIAN_NR: usize = OVERLAP;
 
 /// This is mostly identical to the gain example, minus some fluff, and with a GUI.
 pub struct VoiceMaster {
@@ -49,8 +48,8 @@ pub struct VoiceMaster {
     signal_index: usize,
     /// the curent pitch and clarity
     pitch_val: [f32; 2],
-    /// array of pitches to pick the median from
-    pitches: [f32; MEDIAN_NR],
+    /// vector of pitches to pick the median from
+    pitches: Vec<f32>,
     /// index into "pitches", to use it as a ringbuffer
     median_index: usize,
     /// previous value of the output saw, to calculate the new one from
@@ -95,8 +94,11 @@ struct VoiceMasterParams {
     // https://github.com/alesgenova/pitch-detection/issues/23#issue-1354799855
     #[id = "pick_threshold"]
     pub pick_threshold: FloatParam,
+    // the number of values to pick the median from
+    #[id = "median_nr"]
+    pub median_nr: IntParam,
+    // TODO: use note names in addition to frequencies
     // TODO: add learn function?
-    // TODO: use note names?
     #[id = "min_pitch"]
     pub min_pitch: FloatParam,
     #[id = "max_pitch"]
@@ -121,8 +123,8 @@ impl Default for VoiceMaster {
             median_index: 0,
             previous_saw: 0.0,
             final_pitch: 0.0,
-            // detectors: [McLeodDetector::new(2, 1);MAX_DETECTOR_SIZE_POWER-MIN_DETECTOR_SIZE_POWER],
             // they wil get the real size later
+            // detectors: [McLeodDetector::new(2, 1);NR_OF_DETECTORS],
             detectors: [
                 McLeodDetector::new(2, 1),
                 McLeodDetector::new(2, 1),
@@ -193,7 +195,15 @@ impl Default for VoiceMasterParams {
                     factor: FloatRange::skew_factor(3.7),
                 },
             ),
-            // TODO: use note names in addition to frequencies
+            median_nr: IntParam::new(
+                "Median Number",
+                31,
+                IntRange::Linear {
+                    min: 1 as i32,
+                    max: MAX_MEDIAN_NR as i32,
+                },
+            ),
+
             min_pitch: FloatParam::new(
                 "Minimum Pitch",
                 // A2, min male vocal pitch
@@ -300,17 +310,27 @@ impl Plugin for VoiceMaster {
         let size = 2_usize.pow(
             (self.params.detector_size.value() as usize)
                 as u32);
-
+        // if new detector size
         if self.signals[0].len() != size {
+            // resize the detector input buffers
             for i in 0..OVERLAP {
                 self.signals[i].resize(size as usize, 0.0);
             }
         }
 
+        // set the latency, cannot do that fro a callback
         if self.params.latency.value() {
             context.set_latency_samples(size as u32);
         } else {
             context.set_latency_samples(0);
+        }
+
+        // if there is a new median_nr value
+        if self.pitches.len() != (self.params.median_nr.value() as usize) {
+            // resize the pitches vector
+            self.pitches.resize(self.params.median_nr.value() as usize, 440.0);
+            // reset the median index
+            self.median_index = 0;
         }
 
         let len = self.signals[0].len();
@@ -354,9 +374,7 @@ impl Plugin for VoiceMaster {
                                 self.pitch_val = pitch::pitch(
                                     self.sample_rate,
                                     &self.signals[i],
-                                    // &mut self.detectors[MAX_DETECTOR_SIZE_POWER-MIN_DETECTOR_SIZE_POWER-1],
                                     &mut self.detectors[(self.params.detector_size.value() as usize - MIN_DETECTOR_SIZE_POWER)],
-                                    // detector,
                                     self.params.power_threshold.value(),
                                     // clarity_threshold: use 0.0, so all pitch values are let trough
                                     0.0,
@@ -371,25 +389,20 @@ impl Plugin for VoiceMaster {
                                     // update the pitches
                                     self.pitches[self.median_index] = self.pitch_val[0];
                                     // update the ringbuf pointer
-                                    self.median_index = (self.median_index + 1) % MEDIAN_NR;
+                                    self.median_index = (self.median_index + 1) % (self.params.median_nr.value() as usize);
+                                    // nih_trace!(
+                                    // "i: {}, Frequency: {}, Clarity: {}",
+                                    // i, self.pitch_val[0], self.pitch_val[1]
+                                    // );
                                 }
-                                // nih_trace!(
-                                // "i: {}, Frequency: {}, Clarity: {}",
-                                // i, self.pitch_val[0], self.pitch_val[1]
-                                // );
-
                                 // get the median pitch:
                                 // copy the pitches, we don't want to sort the ringbuffer
-                                let mut sorted : [f32; MEDIAN_NR] = self.pitches;
+                                let mut sorted : Vec<f32> = self.pitches.clone();
                                 // sort the copy
-                                // if sorted[0] != 0.0 {
                                 sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                                // }
-
                                 // get the middle one
                                 self.final_pitch = sorted[sorted.len() / 2];
                                 // nih_trace!("pitch: {}", self.final_pitch);
-                                // println!("pitch: {}", self.final_pitch);
                             }
                         }
                     }
