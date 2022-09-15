@@ -430,20 +430,19 @@ impl Plugin for VoiceMaster {
                                     // ((self.pitches[self.median_index] / self.pitch_val[0]) - 1.0).abs();
                                     // let sign = if ratio > 1.0 { 1.0 } else { -1.0 };
                                     let sign = ratio > 1.0;
-                                    let sp = (((change
-                                                - self.params.ok_change.value())
-                                               * 0.01
-                                               * self.params.change_compression.value() as f32
-                                    )
-                                    )+ self.params.ok_change.value();
-                                    let ratioo = if sign
-                                    { (1.0+ sp).min(1.0+self.params.max_change.value()) }
-                                    else { (1.0 - sp)
-                                            .max(1.0-self.params.max_change.value())
+                                    let sp = ((change - self.params.ok_change.value())
+                                        * 0.01
+                                        * self.params.change_compression.value() as f32)
+                                        + self.params.ok_change.value();
+                                    let ratioo = if sign {
+                                        (1.0 + sp)
+                                        // .min(1.0+self.params.max_change.value())
+                                    } else {
+                                        (1.0 - sp)
+                                        // .max(1.0-self.params.max_change.value())
                                     };
 
-                                    if change > self.params.ok_change.value()
-                                    {
+                                    if (ratio - ratioo).abs() > 0.01 {
                                         println!(
                                             "ratio: {} change: {} change-max: {} sign: {} sp: {} ratioo: {}",
                                             ratio,
@@ -454,6 +453,9 @@ impl Plugin for VoiceMaster {
                                             sp,
                                             ratioo,
                                         );
+                                    };
+
+                                    if change > self.params.ok_change.value() {
                                         // self.previous_pitch = self.pitch_val[0];
                                         // update the pitches
 
