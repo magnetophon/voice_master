@@ -242,7 +242,7 @@ impl Default for VoiceMasterParams {
 
             ok_change: FloatParam::new(
                 "OK Change Rate",
-                0.42,
+                0.0,
                 FloatRange::Skewed {
                     min: 0.0,
                     max: 2.0,
@@ -254,13 +254,13 @@ impl Default for VoiceMasterParams {
                 1.0,
                 FloatRange::Skewed {
                     min: 0.0,
-                    max: 2.0,
-                    factor: FloatRange::skew_factor(0.0),
+                    max: 1.0,
+                    factor: FloatRange::skew_factor(-1.0),
                 },
             ),
             change_compression: IntParam::new(
                 "Change Compression",
-                87,
+                100,
                 IntRange::Linear {
                     min: 1 as i32,
                     max: 100 as i32,
@@ -436,13 +436,13 @@ impl Plugin for VoiceMaster {
                                         + self.params.ok_change.value();
                                     let ratioo = if sign {
                                         (1.0 + sp)
-                                        // .min(1.0+self.params.max_change.value())
+                                        // .min(self.params.max_change.value())
                                     } else {
                                         (1.0 - sp)
-                                        // .max(1.0-self.params.max_change.value())
+                                        // .max(0.0-self.params.max_change.value())
                                     };
 
-                                    if (ratio - ratioo).abs() > 0.01 {
+                                    if (ratio - ratioo).abs() > 0.05 {
                                         println!(
                                             "ratio: {} change: {} change-max: {} sign: {} sp: {} ratioo: {}",
                                             ratio,
@@ -456,14 +456,13 @@ impl Plugin for VoiceMaster {
                                     };
 
                                     if change > self.params.ok_change.value() {
-                                        // self.previous_pitch = self.pitch_val[0];
                                         // update the pitches
 
                                         self.pitches[self.median_index] =
                                         // (ratioo) * self.pitch_val[0];
                                             self.previous_pitch / ratioo;
+                                        // self.previous_pitch = self.pitch_val[0];
                                     } else {
-                                        self.previous_pitch = self.pitch_val[0];
                                         // update the pitches
                                         self.pitches[self.median_index] = self.pitch_val[0];
                                         // update the ringbuf pointer
@@ -474,6 +473,7 @@ impl Plugin for VoiceMaster {
                                         // i, self.pitch_val[0], self.pitch_val[1]
                                         // );
                                     };
+                                    self.previous_pitch = self.pitches[self.median_index];
                                 }
                                 // get the median pitch:
                                 // copy the pitches, we don't want to sort the ringbuffer
