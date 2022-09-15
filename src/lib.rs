@@ -57,6 +57,8 @@ pub struct VoiceMaster {
     previous_saw: f32,
     /// previous value of the raw pitch detector, to calculate the change rate from
     previous_pitch: f32,
+    /// the number of times the change was too big
+    change_counter: i32,
     /// the final pitch that we are using
     final_pitch: f32,
     /// an array of pitch detectors, one for each size:
@@ -108,6 +110,8 @@ struct VoiceMasterParams {
     pub max_pitch: FloatParam,
     #[id = "max_change"]
     pub max_change: FloatParam,
+    #[id = "max_change_count"]
+    pub max_change_count: IntParam,
     #[id = "latency"]
     pub latency: BoolParam,
 }
@@ -127,6 +131,7 @@ impl Default for VoiceMaster {
             median_index: 0,
             previous_saw: 0.0,
             previous_pitch: -1.0,
+            change_counter: 0,
             final_pitch: 0.0,
             // they wil get the real size later
             // detectors: [McLeodDetector::new(2, 1);NR_OF_DETECTORS],
@@ -238,12 +243,19 @@ impl Default for VoiceMasterParams {
 
             max_change: FloatParam::new(
                 "Maximum Change Rate",
-                // A4, max male vocal pitch
                 0.8,
                 FloatRange::Skewed {
-                    min: 1,
-                    max: 1.01,
+                    min: 0.0,
+                    max: 2.0,
                     factor: FloatRange::skew_factor(0.0),
+                },
+            ),
+            max_change_count: IntParam::new(
+                "Maximum Change Count",
+                MEDIAN_NR_DEFAULT,
+                IntRange::Linear {
+                    min: 1 as i32,
+                    max: 100 as i32,
                 },
             ),
             latency: BoolParam::new("Latency", true),
@@ -397,38 +409,39 @@ impl Plugin for VoiceMaster {
                                 );
                                 // if clarity is high enough
                                 if self.pitch_val[1] > self.params.clarity_threshold.value()
-                                // and the pitch isn't too high
+                                // and the pitch isn't too low or too high
                                     && self.pitch_val[0] > self.params.min_pitch.value()
                                     && self.pitch_val[0] < self.params.max_pitch.value()
                                 {
-                                    if self.pitches[self.median_index]
-                                        == self.pitches[(self.median_index + 1)
-                                            % (self.params.median_nr.value() as usize)]
+                                    // update the ringbuf pointer
+                                    // self.median_index = (self.median_index + 1)
+                                    // % (self.params.median_nr.value() as usize);
+                                    let ratio = self.previous_pitch / self.pitch_val[0];
+                                    let change = (ratio - 1.0).abs();
+                                    // let prev_change =
+                                    // ((self.pitches[self.median_index] / self.pitch_val[0]) - 1.0).abs();
+                                    if change > self.params.max_change.value()
+                                    // && self.change_counter < self.params.max_change_count.value()
                                     {
-                                        println! {"same"};
+                                        println!("change: {}", change);
+                                        // self.change_counter = 0;
+                                        // self.previous_pitch = self.pitch_val[0];
+                                        // update the pitches
+                                        self.pitches[self.median_index] =
+                                            (change - self.params.max_change.value())
+                                        // self.change_counter +=1;
+                                    } else {
+                                        // self.change_counter = 0;
+                                        self.previous_pitch = self.pitch_val[0];
                                         // update the pitches
                                         self.pitches[self.median_index] = self.pitch_val[0];
                                         // update the ringbuf pointer
-                                        self.median_index = (self.median_index + 1)
-                                            % (self.params.median_nr.value() as usize);
-                                    } else {
-                                        let change =
-                                            ((self.previous_pitch / self.pitch_val[0]) - 1.0).abs();
-                                        let prev_change =
-                                            ((self.pitches[self.median_index] / self.pitch_val[0]) - 1.0).abs();
-                                        if (change-prev_change).abs() > self.params.max_change.value() {
-                                            println!("change: {}", change);
-                                        } else {
-                                            // update the pitches
-                                            self.pitches[self.median_index] = self.pitch_val[0];
-                                            // update the ringbuf pointer
-                                            self.median_index = (self.median_index + 1)
-                                                % (self.params.median_nr.value() as usize);
-                                            // nih_trace!(
-                                            // "i: {}, Frequency: {}, Clarity: {}",
-                                            // i, self.pitch_val[0], self.pitch_val[1]
-                                            // );
-                                        };
+                                        // self.median_index = (self.median_index + 1)
+                                        // % (self.params.median_nr.value() as usize);
+                                        // nih_trace!(
+                                        // "i: {}, Frequency: {}, Clarity: {}",
+                                        // i, self.pitch_val[0], self.pitch_val[1]
+                                        // );
                                     };
                                 }
                                 // get the median pitch:
@@ -501,5 +514,5 @@ impl Vst3Plugin for VoiceMaster {
     const VST3_CATEGORIES: &'static str = "Fx|Dynamics";
 }
 
-nih_export_clap!(VoiceMaster);
-nih_export_vst3!(VoiceMaster);
+// nih_export_clap!(VoiceMaster);
+// nih_export_vst3!(VoiceMaster);
