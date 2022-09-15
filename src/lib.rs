@@ -252,7 +252,7 @@ impl Default for VoiceMasterParams {
             ),
             max_change_count: IntParam::new(
                 "Maximum Change Count",
-                MEDIAN_NR_DEFAULT,
+                100,
                 IntRange::Linear {
                     min: 1 as i32,
                     max: 100 as i32,
@@ -420,15 +420,40 @@ impl Plugin for VoiceMaster {
                                     let change = (ratio - 1.0).abs();
                                     // let prev_change =
                                     // ((self.pitches[self.median_index] / self.pitch_val[0]) - 1.0).abs();
+                                    // let sign = if ratio > 1.0 { 1.0 } else { -1.0 };
+                                    let sign = ratio > 1.0;
+                                    let sp = (((change
+                                                - self.params.max_change.value())
+                                               // * 0.5
+                                               * 0.01
+                                               * self.params.max_change_count.value() as f32
+                                    )
+                                    )+ self.params.max_change.value();
+                                    let ratioo = if sign
+                                    { 1.0+ sp }
+                                    else { 1.0 - sp };
+
                                     if change > self.params.max_change.value()
                                     // && self.change_counter < self.params.max_change_count.value()
                                     {
-                                        println!("change: {}", change);
+                                        println!(
+                                            "ratio: {} change: {} change-max: {} sign: {} sp: {} ratioo: {}",
+                                            ratio,
+                                            change,
+                                            change - self.params.max_change.value()
+                                                ,
+                                            sign,
+                                            sp,
+                                            ratioo,
+                                        );
                                         // self.change_counter = 0;
                                         // self.previous_pitch = self.pitch_val[0];
                                         // update the pitches
-                                        self.pitches[self.median_index] =
-                                            (change - self.params.max_change.value())
+
+                                        self.pitches[self.median_index] = (
+                                            ratioo
+                                        )
+                                            * self.pitch_val[0];
                                         // self.change_counter +=1;
                                     } else {
                                         // self.change_counter = 0;
