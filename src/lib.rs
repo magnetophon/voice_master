@@ -171,18 +171,6 @@ impl Default for VoiceMasterParams {
                 .with_value_to_string(formatters::v2s_i32_power_of_two())
                 .with_string_to_value(formatters::s2v_i32_power_of_two()),
 
-
-            // window_size_order: IntParam::new(
-            // "Window Size",
-            // DEFAULT_WINDOW_ORDER as i32,
-            // IntRange::Linear {
-            // min: MIN_WINDOW_ORDER as i32,
-            // max: MAX_WINDOW_ORDER as i32,
-            // },
-            // )
-            // .with_value_to_string(formatters::v2s_i32_power_of_two())
-            // .with_string_to_value(formatters::s2v_i32_power_of_two()),
-
             power_threshold: FloatParam::new(
                 "Power Threshold",
                 1.0,
@@ -205,6 +193,7 @@ impl Default for VoiceMasterParams {
                     factor: FloatRange::skew_factor(3.7),
                 },
             ),
+            // TODO: use note names in addition to frequencies
             min_pitch: FloatParam::new(
                 "Minimum Pitch",
                 // A2, min male vocal pitch
@@ -216,7 +205,8 @@ impl Default for VoiceMasterParams {
                     max: 	587.33,
                     factor: FloatRange::skew_factor(-1.0),
                 },
-            ),
+            )
+                .with_unit(" Hz"),
             max_pitch: FloatParam::new(
                 "Maximum Pitch",
                 // A4, max male vocal pitch
@@ -228,9 +218,10 @@ impl Default for VoiceMasterParams {
                     max: 4186.0,
                     factor: FloatRange::skew_factor(-1.0),
                 },
-            ),
+            )
+                .with_unit(" Hz"),
 
-            latency: BoolParam::new("latency", false),
+            latency: BoolParam::new("Latency", false),
         }
     }
 }
@@ -391,9 +382,9 @@ impl Plugin for VoiceMaster {
                                 // copy the pitches, we don't want to sort the ringbuffer
                                 let mut sorted : [f32; MEDIAN_NR] = self.pitches;
                                 // sort the copy
-                                if sorted[0] != 0.0 {
-                                    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                                }
+                                // if sorted[0] != 0.0 {
+                                sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                                // }
 
                                 // get the middle one
                                 self.final_pitch = sorted[sorted.len() / 2];
