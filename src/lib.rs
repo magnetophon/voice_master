@@ -424,7 +424,6 @@ impl Plugin for VoiceMaster {
                                     let sign = ratio > 1.0;
                                     let sp = (((change
                                                 - self.params.max_change.value())
-                                               // * 0.5
                                                * 0.01
                                                * self.params.max_change_count.value() as f32
                                     )
@@ -450,10 +449,9 @@ impl Plugin for VoiceMaster {
                                         // self.previous_pitch = self.pitch_val[0];
                                         // update the pitches
 
-                                        self.pitches[self.median_index] = (
-                                            ratioo
-                                        )
-                                            * self.pitch_val[0];
+                                        self.pitches[self.median_index] =
+                                        // (ratioo) * self.pitch_val[0];
+                                            self.previous_pitch / ratioo;
                                         // self.change_counter +=1;
                                     } else {
                                         // self.change_counter = 0;
