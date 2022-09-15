@@ -20,8 +20,8 @@ const MIN_DETECTOR_SIZE_POWER: usize = 6;
 // for when you want to play 6 string bassguitar at 192k
 const MAX_DETECTOR_SIZE_POWER: usize = 13;
 /// the number of detectors we need, one for each size
-const NR_OF_DETECTORS:usize = MAX_DETECTOR_SIZE_POWER-MIN_DETECTOR_SIZE_POWER+1;
-const MAX_SIZE:usize = 2_usize.pow(MAX_DETECTOR_SIZE_POWER as u32);
+const NR_OF_DETECTORS: usize = MAX_DETECTOR_SIZE_POWER - MIN_DETECTOR_SIZE_POWER + 1;
+const MAX_SIZE: usize = 2_usize.pow(MAX_DETECTOR_SIZE_POWER as u32);
 /// the nr of times the detector is updated each DETECTOR_SIZE samples
 // TODO: make variable?
 const OVERLAP: usize = 32;
@@ -55,10 +55,12 @@ pub struct VoiceMaster {
     median_index: usize,
     /// previous value of the output saw, to calculate the new one from
     previous_saw: f32,
+    /// previous value of the raw pitch detector, to calculate the change rate from
+    previous_pitch: f32,
     /// the final pitch that we are using
     final_pitch: f32,
     /// an array of pitch detectors, one for each size:
-    detectors: [McLeodDetector<f32>;NR_OF_DETECTORS],
+    detectors: [McLeodDetector<f32>; NR_OF_DETECTORS],
     // detectors: [McLeodDetector<f32>;7],
 }
 
@@ -104,9 +106,10 @@ struct VoiceMasterParams {
     pub min_pitch: FloatParam,
     #[id = "max_pitch"]
     pub max_pitch: FloatParam,
+    #[id = "max_change"]
+    pub max_change: FloatParam,
     #[id = "latency"]
     pub latency: BoolParam,
-
 }
 
 impl Default for VoiceMaster {
@@ -123,6 +126,7 @@ impl Default for VoiceMaster {
             pitches: Default::default(),
             median_index: 0,
             previous_saw: 0.0,
+            previous_pitch: -1.0,
             final_pitch: 0.0,
             // they wil get the real size later
             // detectors: [McLeodDetector::new(2, 1);NR_OF_DETECTORS],
@@ -170,9 +174,9 @@ impl Default for VoiceMasterParams {
                     max: MAX_DETECTOR_SIZE_POWER as i32,
                 },
             )
-                .with_unit(" samples")
-                .with_value_to_string(formatters::v2s_i32_power_of_two())
-                .with_string_to_value(formatters::s2v_i32_power_of_two()),
+            .with_unit(" samples")
+            .with_value_to_string(formatters::v2s_i32_power_of_two())
+            .with_string_to_value(formatters::s2v_i32_power_of_two()),
 
             power_threshold: FloatParam::new(
                 "Power Threshold",
@@ -213,11 +217,11 @@ impl Default for VoiceMasterParams {
                     // A0:
                     min: 27.5,
                     // D5, min of picolo flute
-                    max: 	587.33,
+                    max: 587.33,
                     factor: FloatRange::skew_factor(-1.0),
                 },
             )
-                .with_unit(" Hz"),
+            .with_unit(" Hz"),
             max_pitch: FloatParam::new(
                 "Maximum Pitch",
                 // A4, max male vocal pitch
@@ -230,8 +234,18 @@ impl Default for VoiceMasterParams {
                     factor: FloatRange::skew_factor(-1.0),
                 },
             )
-                .with_unit(" Hz"),
+            .with_unit(" Hz"),
 
+            max_change: FloatParam::new(
+                "Maximum Change Rate",
+                // A4, max male vocal pitch
+                0.8,
+                FloatRange::Skewed {
+                    min: 1,
+                    max: 1.01,
+                    factor: FloatRange::skew_factor(0.0),
+                },
+            ),
             latency: BoolParam::new("Latency", true),
         }
     }
@@ -293,7 +307,7 @@ impl Plugin for VoiceMaster {
         }
         for i in 0..NR_OF_DETECTORS {
             // let size = 2^i;
-            let size = 2_usize.pow((i+MIN_DETECTOR_SIZE_POWER) as u32);
+            let size = 2_usize.pow((i + MIN_DETECTOR_SIZE_POWER) as u32);
             let padding = size / 2;
             self.detectors[i] = McLeodDetector::new(size, padding);
             // println!("i: {}, pow: {}, size: {}",i, i+MIN_DETECTOR_SIZE_POWER, size)
@@ -308,9 +322,7 @@ impl Plugin for VoiceMaster {
         context: &mut impl ProcessContext,
     ) -> ProcessStatus {
         let mut channel_counter = 0;
-        let size = 2_usize.pow(
-            (self.params.detector_size.value() as usize)
-                as u32);
+        let size = 2_usize.pow((self.params.detector_size.value() as usize) as u32);
         // if new detector size
         if self.signals[0].len() != size {
             // resize the detector input buffers
@@ -329,13 +341,13 @@ impl Plugin for VoiceMaster {
         // if there is a new median_nr value
         if self.pitches.len() != (self.params.median_nr.value() as usize) {
             // resize the pitches vector
-            self.pitches.resize(self.params.median_nr.value() as usize, 440.0);
+            self.pitches
+                .resize(self.params.median_nr.value() as usize, 440.0);
             // reset the median index
             self.median_index = 0;
         }
 
         let len = self.signals[0].len();
-
 
         for channel_samples in buffer.iter_samples() {
             let mut amplitude = 0.0;
@@ -351,13 +363,13 @@ impl Plugin for VoiceMaster {
                         amplitude += *sample;
                         // copy our sample to signal
                         for i in 0..OVERLAP {
-                            self.signals[i][staggered_index(i,self.signal_index,len)] =
+                            self.signals[i][staggered_index(i, self.signal_index, len)] =
                                 *sample as f32;
                         }
                         // if the user coosec to sync up the audio with the pitch
                         if self.params.latency.value() {
                             // delay our sample
-                            *sample = self.signals[0][(self.signal_index+1)%len];
+                            *sample = self.signals[0][(self.signal_index + 1) % len];
                         }
 
                         // update the index
@@ -370,12 +382,14 @@ impl Plugin for VoiceMaster {
                         for i in 0..OVERLAP {
                             // if index[i] == 0
                             // so IOW: when the buffer is full
-                            if staggered_index(i,self.signal_index,len) == 0 {
+                            if staggered_index(i, self.signal_index, len) == 0 {
                                 // call the pitchtracker
                                 self.pitch_val = pitch::pitch(
                                     self.sample_rate,
                                     &self.signals[i],
-                                    &mut self.detectors[(self.params.detector_size.value() as usize - MIN_DETECTOR_SIZE_POWER)],
+                                    &mut self.detectors[(self.params.detector_size.value()
+                                        as usize
+                                        - MIN_DETECTOR_SIZE_POWER)],
                                     self.params.power_threshold.value(),
                                     // clarity_threshold: use 0.0, so all pitch values are let trough
                                     0.0,
@@ -387,22 +401,44 @@ impl Plugin for VoiceMaster {
                                     && self.pitch_val[0] > self.params.min_pitch.value()
                                     && self.pitch_val[0] < self.params.max_pitch.value()
                                 {
-                                    // update the pitches
-                                    self.pitches[self.median_index] = self.pitch_val[0];
-                                    // update the ringbuf pointer
-                                    self.median_index = (self.median_index + 1) % (self.params.median_nr.value() as usize);
-                                    // nih_trace!(
-                                    // "i: {}, Frequency: {}, Clarity: {}",
-                                    // i, self.pitch_val[0], self.pitch_val[1]
-                                    // );
+                                    if self.pitches[self.median_index]
+                                        == self.pitches[(self.median_index + 1)
+                                            % (self.params.median_nr.value() as usize)]
+                                    {
+                                        println! {"same"};
+                                        // update the pitches
+                                        self.pitches[self.median_index] = self.pitch_val[0];
+                                        // update the ringbuf pointer
+                                        self.median_index = (self.median_index + 1)
+                                            % (self.params.median_nr.value() as usize);
+                                    } else {
+                                        let change =
+                                            ((self.previous_pitch / self.pitch_val[0]) - 1.0).abs();
+                                        let prev_change =
+                                            ((self.pitches[self.median_index] / self.pitch_val[0]) - 1.0).abs();
+                                        if (change-prev_change).abs() > self.params.max_change.value() {
+                                            println!("change: {}", change);
+                                        } else {
+                                            // update the pitches
+                                            self.pitches[self.median_index] = self.pitch_val[0];
+                                            // update the ringbuf pointer
+                                            self.median_index = (self.median_index + 1)
+                                                % (self.params.median_nr.value() as usize);
+                                            // nih_trace!(
+                                            // "i: {}, Frequency: {}, Clarity: {}",
+                                            // i, self.pitch_val[0], self.pitch_val[1]
+                                            // );
+                                        };
+                                    };
                                 }
                                 // get the median pitch:
                                 // copy the pitches, we don't want to sort the ringbuffer
-                                let mut sorted : Vec<f32> = self.pitches.clone();
+                                let mut sorted: Vec<f32> = self.pitches.clone();
                                 // sort the copy
                                 sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
                                 // get the middle one
-                                self.final_pitch = sorted[sorted.len() / 2];
+                                // self.final_pitch = sorted[sorted.len() / 2];
+                                self.final_pitch = self.pitches[self.median_index];
                                 // nih_trace!("pitch: {}", self.final_pitch);
                             }
                         }
@@ -439,7 +475,7 @@ impl Plugin for VoiceMaster {
             }
         }
 
-        fn staggered_index(i:usize,index:usize,len:usize) -> usize {
+        fn staggered_index(i: usize, index: usize, len: usize) -> usize {
             (index + (i * (len / OVERLAP))) % len
         }
 

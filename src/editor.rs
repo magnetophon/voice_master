@@ -61,10 +61,10 @@ pub(crate) fn create(
                 Some(Duration::from_millis(600)),
             )
             // This is how adding padding works in vizia
-                .top(Pixels(0.0));
+            .top(Pixels(0.0));
         })
-            .row_between(Pixels(0.0))
-            .child_left(Stretch(1.0))
-            .child_right(Stretch(1.0));
+        .row_between(Pixels(0.0))
+        .child_left(Stretch(1.0))
+        .child_right(Stretch(1.0));
     })
 }
