@@ -53,24 +53,18 @@ pub(crate) fn create(
                 // Make this more or less align with the parameters column
                 .right(Pixels(67.0));
 
-            ScrollView::new(cx, 0.0, 0.0, false, true, |cx| {
-                // This looks better if it's flush at the top, and then we'll just add some padding
-                // at the top of the scroll view
-                GenericUi::new(cx, Data::params).child_top(Pixels(0.0));
-                PeakMeter::new(
-                    cx,
-                    Data::peak_meter
-                        .map(|peak_meter| util::gain_to_db(peak_meter.load(Ordering::Relaxed))),
-                    Some(Duration::from_millis(600)),
-                )
-                // This is how adding padding works in vizia
-                .top(Pixels(10.0));
-            })
-            .width(Percentage(100.0))
-            .top(Pixels(5.0));
+            GenericUi::new(cx, Data::params).child_top(Pixels(0.0));
+            PeakMeter::new(
+                cx,
+                Data::peak_meter
+                    .map(|peak_meter| util::gain_to_db(peak_meter.load(Ordering::Relaxed))),
+                Some(Duration::from_millis(600)),
+            )
+            // This is how adding padding works in vizia
+                .top(Pixels(0.0));
         })
-        .row_between(Pixels(0.0))
-        .child_left(Stretch(1.0))
-        .child_right(Stretch(1.0));
+            .row_between(Pixels(0.0))
+            .child_left(Stretch(1.0))
+            .child_right(Stretch(1.0));
     })
 }
