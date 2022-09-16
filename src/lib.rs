@@ -242,11 +242,11 @@ impl Default for VoiceMasterParams {
 
             ok_change: FloatParam::new(
                 "OK Change Rate",
-                0.42,
+                0.001,
                 FloatRange::Skewed {
                     min: 0.0,
-                    max: 2.0,
-                    factor: FloatRange::skew_factor(0.0),
+                    max: 1.0,
+                    factor: FloatRange::skew_factor(-2.0),
                 },
             ),
             max_change: FloatParam::new(
@@ -260,11 +260,11 @@ impl Default for VoiceMasterParams {
             ),
             change_compression: FloatParam::new(
                 "Change Compression",
-                0.03,
+                0.042,
                 FloatRange::Skewed {
                     min: 0.0,
                     max: 1.0,
-                    factor: FloatRange::skew_factor(-1.0),
+                    factor: FloatRange::skew_factor(-2.0),
                 },
             ),
             latency: BoolParam::new("Latency", true),
@@ -452,7 +452,7 @@ impl Plugin for VoiceMaster {
                                         // self.previous_pitch = self.pitch_val[0];
                                         if (ratio - ratioo).abs() > 0.05 {
                                             println!(
-                                                "ratio: {} change: {} change-max: {} sign: {} sp: {} ratioo: {}",
+                                                "ratio: {} change: {} change-ok: {} sign: {} sp: {} ratioo: {}",
                                                 ratio,
                                                 change,
                                                 change - self.params.ok_change.value()
