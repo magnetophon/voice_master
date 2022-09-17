@@ -3,6 +3,10 @@ use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
 use pitch_detection::detector::mcleod::McLeodDetector;
 use std::sync::Arc;
+use simple_eq::*;
+use simple_eq::design::Curve;
+
+
 
 mod editor;
 mod pitch;
@@ -27,7 +31,7 @@ const MAX_SIZE: usize = 2_usize.pow(MAX_DETECTOR_SIZE_POWER as u32);
 const OVERLAP: usize = 32;
 /// The median is taken from at max this nr of pitches
 const MAX_MEDIAN_NR: usize = OVERLAP;
-const MEDIAN_NR_DEFAULT: i32 = 7;
+const MEDIAN_NR_DEFAULT: i32 = 1;
 
 /// This is mostly identical to the gain example, minus some fluff, and with a GUI.
 pub struct VoiceMaster {
@@ -43,6 +47,8 @@ pub struct VoiceMaster {
     peak_meter: Arc<AtomicF32>,
     /// sample rate
     sample_rate: f32,
+    /// the delay-line to use for the latency compensation
+    delay_line: Vec<f32>,
     /// an array of signals to be used in the pitchtrackers
     signals: [Vec<f32>; OVERLAP],
     /// the sample index of the above signals
@@ -62,6 +68,7 @@ pub struct VoiceMaster {
     /// an array of pitch detectors, one for each size:
     detectors: [McLeodDetector<f32>; NR_OF_DETECTORS],
     // detectors: [McLeodDetector<f32>;7],
+    eq: Equalizer<f32>,
 }
 
 #[derive(Params)]
@@ -106,6 +113,10 @@ struct VoiceMasterParams {
     pub min_pitch: FloatParam,
     #[id = "max_pitch"]
     pub max_pitch: FloatParam,
+    #[id = "hp_freq"]
+    pub hp_freq: FloatParam,
+    #[id = "lp_freq"]
+    pub lp_freq: FloatParam,
     #[id = "ok_change"]
     pub ok_change: FloatParam,
     #[id = "max_change"]
@@ -124,6 +135,7 @@ impl Default for VoiceMaster {
             peak_meter_decay_weight: 1.0,
             peak_meter: Arc::new(AtomicF32::new(util::MINUS_INFINITY_DB)),
             sample_rate: 0.0,
+            delay_line: vec![0.0;MAX_SIZE],
             signals: Default::default(),
             signal_index: 0,
             pitch_val: [-1.0, 0.0],
@@ -144,6 +156,7 @@ impl Default for VoiceMaster {
                 McLeodDetector::new(2, 1),
                 McLeodDetector::new(2, 1),
             ],
+            eq: Equalizer::new(48000.0),
         }
     }
 }
@@ -225,7 +238,10 @@ impl Default for VoiceMasterParams {
                     factor: FloatRange::skew_factor(-1.0),
                 },
             )
-            .with_unit(" Hz"),
+            // .with_callback({
+            // self.updateHP = true;
+            // })
+                .with_unit(" Hz"),
             max_pitch: FloatParam::new(
                 "Maximum Pitch",
                 // A4, max male vocal pitch
@@ -238,11 +254,51 @@ impl Default for VoiceMasterParams {
                     factor: FloatRange::skew_factor(-1.0),
                 },
             )
-            .with_unit(" Hz"),
+            // .with_callback({
+            // self.updateLP = true;
+            // })
+                .with_unit(" Hz"),
+
+            hp_freq: FloatParam::new(
+                "High Pass Frequency",
+
+                // A2, min male vocal pitch
+                82.407,
+                FloatRange::Skewed {
+                    // A0:
+                    min: 0.1,
+                    // D5, min of picolo flute
+                    max: 587.33,
+                    factor: FloatRange::skew_factor(-1.0),
+                },
+            )
+            // .with_callback({
+            // self.updateHP = true;
+            // })
+                .with_smoother(SmoothingStyle::Logarithmic(50.0))
+                .with_unit(" Hz"),
+            lp_freq: FloatParam::new(
+                "Low Pass Frequency",
+                // A4, max male vocal pitch
+                4400.0,
+                FloatRange::Skewed {
+                    // A2
+                    min: 82.407,
+                    // C8, max of picolo flute
+                    max: 2.2e4,
+                    factor: FloatRange::skew_factor(-1.0),
+                },
+            )
+            // .with_callback({
+            // self.updateLP = true;
+            // })
+                .with_smoother(SmoothingStyle::Logarithmic(50.0))
+                .with_unit(" Hz"),
 
             ok_change: FloatParam::new(
                 "OK Change Rate",
-                0.001,
+                // 0.001,
+                1.0,
                 FloatRange::Skewed {
                     min: 0.0,
                     max: 1.0,
@@ -322,6 +378,10 @@ impl Plugin for VoiceMaster {
             as f32;
         self.sample_rate = buffer_config.sample_rate;
 
+        // create an EQ for a given sample rate
+        self.eq = Equalizer::new(self.sample_rate as f32);
+
+
         // init all signals with the max size
         for i in 0..OVERLAP {
             self.signals[i].resize(MAX_SIZE, 0.0);
@@ -365,32 +425,49 @@ impl Plugin for VoiceMaster {
             self.pitches
                 .resize(self.params.median_nr.value() as usize, 440.0);
             // reset the median index
-            self.median_index = 0;
+            self.median_index = self.median_index % self.params.median_nr.value() as usize;
         }
 
         let len = self.signals[0].len();
+
+
 
         for channel_samples in buffer.iter_samples() {
             let mut amplitude = 0.0;
             let num_samples = channel_samples.len();
 
             let gain = self.params.gain.smoothed.next();
+            // set the filter frequencies
+            self.eq.set(0, Curve::Highpass, self.params.hp_freq.smoothed.next(), 1.0, 0.0);
+            self.eq.set(1, Curve::Lowpass, self.params.lp_freq.smoothed.next(), 1.0, 0.0);
+            // self.eq.set(0, Curve::Highpass, 220.0, 1.0, 0.0);
+            // self.eq.set(1, Curve::Lowpass, 440.0, 1.0, 0.0);
+
             for sample in channel_samples {
                 // which of the 3 channels are we on
                 match channel_counter {
                     // audio:
                     0 => {
+                        let signal_index = self.signal_index % len;
                         *sample *= gain;
                         amplitude += *sample;
-                        // copy our sample to signal
+
+                        // fill the delay line
+                        self.delay_line[signal_index] = *sample;
+                        // apply the filters to a copy of the sample
+                        // we don't want to filter the main audio output, just the pitch detector input
+                        let mut sample_filtered = *sample;
+                        sample_filtered = self.eq.process(sample_filtered);
+
+                        // copy our filtered sample to signal
                         for i in 0..OVERLAP {
-                            self.signals[i][staggered_index(i, self.signal_index, len)] =
-                                *sample as f32;
+                            self.signals[i][staggered_index(i, signal_index, len)] =
+                                sample_filtered as f32;
                         }
-                        // if the user coosec to sync up the audio with the pitch
+                        // if the user chooses to sync up the audio with the pitch
                         if self.params.latency.value() {
                             // delay our sample
-                            *sample = self.signals[0][(self.signal_index + 1) % len];
+                            *sample = self.delay_line[(signal_index + 1) % len];
                         }
 
                         // update the index
@@ -409,8 +486,8 @@ impl Plugin for VoiceMaster {
                                     self.sample_rate,
                                     &self.signals[i],
                                     &mut self.detectors[(self.params.detector_size.value()
-                                        as usize
-                                        - MIN_DETECTOR_SIZE_POWER)],
+                                                         as usize
+                                                         - MIN_DETECTOR_SIZE_POWER)],
                                     self.params.power_threshold.value(),
                                     // clarity_threshold: use 0.0, so all pitch values are let trough
                                     0.0,
@@ -422,9 +499,6 @@ impl Plugin for VoiceMaster {
                                     && self.pitch_val[0] > self.params.min_pitch.value()
                                     && self.pitch_val[0] < self.params.max_pitch.value()
                                 {
-                                    // update the ringbuf pointer
-                                    // self.median_index = (self.median_index + 1)
-                                    // % (self.params.median_nr.value() as usize);
                                     let ratio = self.previous_pitch / self.pitch_val[0];
                                     let change = (ratio - 1.0).abs();
                                     // let prev_change =
@@ -432,15 +506,15 @@ impl Plugin for VoiceMaster {
                                     // let sign = if ratio > 1.0 { 1.0 } else { -1.0 };
                                     let sign = ratio > 1.0;
                                     let sp = ((change - self.params.ok_change.value())
-                                        * self.params.change_compression.value() as f32)
+                                              * self.params.change_compression.value() as f32)
                                         + self.params.ok_change.value();
                                     let ratioo = if sign {
-                                        (1.0 + sp)
-                                        // .min(self.params.max_change.value())
-                                    } else {
-                                        (1.0 - sp)
-                                        // .max(0.0-self.params.max_change.value())
-                                    };
+                                        1.0 + sp
+                                        // (1.0 + sp).min(self.params.max_change.value())
+                                        } else {
+                                        1.0 - sp
+                                        // (1.0 - sp).max(0.0-self.params.max_change.value())
+                                        };
 
 
                                     if change > self.params.ok_change.value() {
@@ -449,32 +523,35 @@ impl Plugin for VoiceMaster {
                                         self.pitches[self.median_index] =
                                         // (ratioo) * self.pitch_val[0];
                                             self.previous_pitch / ratioo;
+                                        // update the ringbuf pointer
+                                        self.median_index = (self.median_index + 1)
+                                            % (self.params.median_nr.value() as usize);
                                         // self.previous_pitch = self.pitch_val[0];
                                         if (ratio - ratioo).abs() > 0.05 {
-                                            println!(
-                                                "ratio: {} change: {} change-ok: {} sign: {} sp: {} ratioo: {}",
-                                                ratio,
-                                                change,
-                                                change - self.params.ok_change.value()
-                                                    ,
-                                                sign,
-                                                sp,
-                                                ratioo,
-                                            );
+                                            // println!(
+                                            // "ratio: {} change: {} change-ok: {} sign: {} sp: {} ratioo: {}",
+                                            // ratio,
+                                            // change,
+                                            // change - self.params.ok_change.value()
+                                            // ,
+                                            // sign,
+                                            // sp,
+                                            // ratioo,
+                                            // );
                                         };
 
                                     } else {
                                         // update the pitches
                                         self.pitches[self.median_index] = self.pitch_val[0];
                                         // update the ringbuf pointer
-                                        // self.median_index = (self.median_index + 1)
-                                        // % (self.params.median_nr.value() as usize);
+                                        self.median_index = (self.median_index + 1)
+                                            % (self.params.median_nr.value() as usize);
                                         // nih_trace!(
                                         // "i: {}, Frequency: {}, Clarity: {}",
                                         // i, self.pitch_val[0], self.pitch_val[1]
                                         // );
                                     };
-                                    self.previous_pitch = self.pitches[self.median_index];
+                                    // self.previous_pitch = self.pitches[self.median_index];
                                 }
                                 // get the median pitch:
                                 // copy the pitches, we don't want to sort the ringbuffer
@@ -483,7 +560,9 @@ impl Plugin for VoiceMaster {
                                 sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
                                 // get the middle one
                                 // self.final_pitch = sorted[sorted.len() / 2];
-                                self.final_pitch = self.pitches[self.median_index];
+                                self.final_pitch = self.pitches.iter().sum::<f32>()/self.params.median_nr.value() as f32;
+                                // self.final_pitch = self.pitches[self.median_index];
+                                self.previous_pitch = self.final_pitch;
                                 // nih_trace!("pitch: {}", self.final_pitch);
                             }
                         }

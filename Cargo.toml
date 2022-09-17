@@ -30,6 +30,8 @@ atomic_float = "0.1"
 
 pitch-detection = { git = "https://github.com/magnetophon/pitch-detection.git" }
 
+simple-eq = { git = "https://github.com/m-hilgendorf/simple-eq.git" }
+
 # [patch]
 # [patch.'https://github.com/magnetophon/pitch-detection']
 # pitch-detection = { path = "../pitch-detection" }
