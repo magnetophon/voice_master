@@ -35,3 +35,11 @@ simple-eq = { git = "https://github.com/m-hilgendorf/simple-eq.git" }
 # [patch]
 # [patch.'https://github.com/magnetophon/pitch-detection']
 # pitch-detection = { path = "../pitch-detection" }
+[profile.release]
+lto = "thin"
+strip = "symbols"
+
+[profile.profiling]
+inherits = "release"
+debug = true
+strip = "none"
