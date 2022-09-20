@@ -63,7 +63,7 @@ const MAX_SIZE: usize = 2_usize.pow(MAX_DETECTOR_SIZE_POWER as u32);
 /// the maximum nr of times the detector is updated each 2048 samples
 const MAX_OVERLAP: usize = 128;
 /// The median is taken from at max this nr of pitches
-const MAX_MEDIAN_NR: usize = MAX_OVERLAP;
+const MAX_MEDIAN_NR: usize = 32;
 const MEDIAN_NR_DEFAULT: i32 = 1;
 
 /// This is mostly identical to the gain example, minus some fluff, and with a GUI.
