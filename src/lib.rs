@@ -2,11 +2,9 @@ use atomic_float::AtomicF32;
 use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
 use pitch_detection::detector::mcleod::McLeodDetector;
-use std::sync::Arc;
-use simple_eq::*;
 use simple_eq::design::Curve;
-
-
+use simple_eq::*;
+use std::sync::Arc;
 
 mod editor;
 mod pitch;
@@ -85,9 +83,9 @@ pub struct VoiceMaster {
     sample_rate: f32,
     /// the delay-line to use for the latency compensation
     delay_line: Vec<f32>,
-    /// an array of signals to be used in the pitchtrackers
-    signals: [Vec<f32>; OVERLAP],
-    /// the sample index of the above signals
+    /// the signal to be used in the pitchtrackers
+    signal: Vec<f32>,
+    /// the sample index of the above signal
     signal_index: usize,
     /// the curent pitch and clarity
     pitch_val: [f32; 2],
@@ -103,7 +101,6 @@ pub struct VoiceMaster {
     final_pitch: f32,
     /// an array of pitch detectors, one for each size:
     detectors: [McLeodDetector<f32>; NR_OF_DETECTORS],
-    // detectors: [McLeodDetector<f32>;7],
     eq: Equalizer<f32>,
 }
 
@@ -171,11 +168,11 @@ impl Default for VoiceMaster {
             peak_meter_decay_weight: 1.0,
             peak_meter: Arc::new(AtomicF32::new(util::MINUS_INFINITY_DB)),
             sample_rate: 0.0,
-            delay_line: vec![0.0;MAX_SIZE],
-            signals: Default::default(),
+            delay_line: vec![0.0; MAX_SIZE],
+            signal: vec![0.0; MAX_SIZE],
             signal_index: 0,
             pitch_val: [-1.0, 0.0],
-            pitches: vec![0.0;MAX_MEDIAN_NR],
+            pitches: vec![0.0; MAX_MEDIAN_NR],
             median_index: 0,
             previous_saw: 0.0,
             previous_pitch: -1.0,
@@ -248,9 +245,9 @@ impl Default for VoiceMasterParams {
                 "Pick Threshold",
                 0.999,
                 FloatRange::Skewed {
-                    min: 0.98,
+                    min: 0.8,
                     max: 1.0,
-                    factor: FloatRange::skew_factor(3.7),
+                    factor: FloatRange::skew_factor(2.0),
                 },
             ),
             median_nr: IntParam::new(
@@ -264,7 +261,7 @@ impl Default for VoiceMasterParams {
 
             min_pitch: FloatParam::new(
                 "Minimum Pitch",
-                // A2, min male vocal pitch
+                // E2, min male vocal pitch
                 82.407,
                 FloatRange::Skewed {
                     // A0:
@@ -274,14 +271,11 @@ impl Default for VoiceMasterParams {
                     factor: FloatRange::skew_factor(-1.0),
                 },
             )
-            // .with_callback({
-            // self.updateHP = true;
-            // })
-                .with_unit(" Hz"),
+            .with_unit(" Hz"),
             max_pitch: FloatParam::new(
                 "Maximum Pitch",
-                // A4, max male vocal pitch
-                440.0,
+                // F6, max 
+                1396.91,
                 FloatRange::Skewed {
                     // A2
                     min: 82.407,
@@ -290,16 +284,12 @@ impl Default for VoiceMasterParams {
                     factor: FloatRange::skew_factor(-1.0),
                 },
             )
-            // .with_callback({
-            // self.updateLP = true;
-            // })
-                .with_unit(" Hz"),
+            .with_unit(" Hz"),
 
             hp_freq: FloatParam::new(
                 "High Pass Frequency",
-
-                // A2, min male vocal pitch
-                82.407,
+                // E1, an octave below the min male vocal pitch
+                41.203,
                 FloatRange::Skewed {
                     // A0:
                     min: 10.0,
@@ -308,11 +298,7 @@ impl Default for VoiceMasterParams {
                     factor: FloatRange::skew_factor(-1.0),
                 },
             )
-            // .with_callback({
-            // self.updateHP = true;
-            // })
-            // .with_smoother(SmoothingStyle::Logarithmic(50.0))
-                .with_unit(" Hz"),
+            .with_unit(" Hz"),
             lp_freq: FloatParam::new(
                 "Low Pass Frequency",
                 // A4, max male vocal pitch
@@ -320,39 +306,36 @@ impl Default for VoiceMasterParams {
                 FloatRange::Skewed {
                     // A2
                     min: 82.407,
-                    // C8, max of picolo flute
+                    // 22k
                     max: 2.2e4,
                     factor: FloatRange::skew_factor(-1.0),
                 },
             )
-            // .with_callback({
-            // self.updateLP = true;
-            // })
-            // .with_smoother(SmoothingStyle::Logarithmic(50.0))
-                .with_unit(" Hz"),
+            .with_unit(" Hz"),
 
             ok_change: FloatParam::new(
                 "OK Change Rate",
                 // 0.001,
-                1.0,
+                2.0,
                 FloatRange::Skewed {
                     min: 0.0,
-                    max: 1.0,
+                    max: 2.0,
                     factor: FloatRange::skew_factor(-2.0),
                 },
             ),
             max_change: FloatParam::new(
                 "max Change Rate",
-                1.0,
+                2.0,
                 FloatRange::Skewed {
                     min: 0.0,
-                    max: 1.0,
+                    max: 2.0,
                     factor: FloatRange::skew_factor(-1.0),
                 },
             ),
             change_compression: FloatParam::new(
                 "Change Compression",
-                0.042,
+                // 0.042,
+                1.0,
                 FloatRange::Skewed {
                     min: 0.0,
                     max: 1.0,
@@ -396,7 +379,6 @@ impl Plugin for VoiceMaster {
     }
 
     fn accepts_bus_config(&self, config: &BusConfig) -> bool {
-        // This works with any symmetrical IO layout
         config.num_input_channels == Self::DEFAULT_INPUT_CHANNELS
             && config.num_output_channels == Self::DEFAULT_OUTPUT_CHANNELS
     }
@@ -417,11 +399,8 @@ impl Plugin for VoiceMaster {
         // create an EQ for a given sample rate
         self.eq = Equalizer::new(self.sample_rate as f32);
 
-
-        // init all signals with the max size
-        for i in 0..OVERLAP {
-            self.signals[i].resize(MAX_SIZE, 0.0);
-        }
+        // init signal with the max size
+        // self.signal.resize(MAX_SIZE, 0.0);
         for i in 0..NR_OF_DETECTORS {
             // let size = 2^i;
             let size = 2_usize.pow((i + MIN_DETECTOR_SIZE_POWER) as u32);
@@ -440,13 +419,6 @@ impl Plugin for VoiceMaster {
     ) -> ProcessStatus {
         let mut channel_counter = 0;
         let size = 2_usize.pow((self.params.detector_size.value() as usize) as u32);
-        // if new detector size
-        if self.signals[0].len() != size {
-            // resize the detector input buffers
-            for i in 0..OVERLAP {
-                self.signals[i].resize(size as usize, 0.0);
-            }
-        }
 
         // set the latency, cannot do that from a callback
         if self.params.latency.value() {
@@ -464,12 +436,13 @@ impl Plugin for VoiceMaster {
             self.median_index = self.median_index % self.params.median_nr.value() as usize;
         }
 
-        let len = self.signals[0].len();
+        // let len = self.signals[0].len();
 
         // set the filter frequencies
-        self.eq.set(0, Curve::Highpass, self.params.hp_freq.value(), 1.0, 0.0);
-        self.eq.set(1, Curve::Lowpass, self.params.lp_freq.value(), 1.0, 0.0);
-
+        self.eq
+            .set(0, Curve::Highpass, self.params.hp_freq.value(), 1.0, 0.0);
+        self.eq
+            .set(1, Curve::Lowpass, self.params.lp_freq.value(), 1.0, 0.0);
 
         for channel_samples in buffer.iter_samples() {
             let mut amplitude = 0.0;
@@ -482,7 +455,7 @@ impl Plugin for VoiceMaster {
                 match channel_counter {
                     // audio:
                     0 => {
-                        let signal_index = self.signal_index % len;
+                        let signal_index = self.signal_index;
                         *sample *= gain;
                         amplitude += *sample;
 
@@ -494,31 +467,38 @@ impl Plugin for VoiceMaster {
                         sample_filtered = self.eq.process(sample_filtered);
 
                         // copy our filtered sample to signal
-                        for i in 0..OVERLAP {
-                            self.signals[i][staggered_index(i, signal_index, len)] =
-                                sample_filtered as f32;
-                        }
+                        self.signal[signal_index] = sample_filtered as f32;
                         // if the user chooses to sync up the audio with the pitch
                         if self.params.latency.value() {
                             // delay our sample
-                            *sample = self.delay_line[(signal_index + 1) % len];
+                            *sample = self.delay_line[(signal_index - size) % MAX_SIZE];
                         }
 
                         // update the index
-                        self.signal_index += 1;
-                        if self.signal_index == len {
-                            self.signal_index = 0;
-                        };
+                        self.signal_index = (self.signal_index + 1) % MAX_SIZE;
 
                         // do OVERLAP nr of times:
                         for i in 0..OVERLAP {
                             // if index[i] == 0
                             // so IOW: when the buffer is full
-                            if staggered_index(i, self.signal_index, len) == 0 {
+                            if staggered_index(i, self.signal_index, size) == 0 {
+                                // [ &v[..3], &v[l - 3..]].concat()
+                                let index_plus_size = (signal_index + size) % MAX_SIZE;
+                                let mut slice = vec![0.0; MAX_SIZE];
+                                if signal_index < index_plus_size {
+                                    slice = self.signal[signal_index..index_plus_size].to_vec();
+                                } else {
+                                    slice = [
+                                        &self.signal[signal_index..],
+                                        &self.signal[..index_plus_size],
+                                    ]
+                                        .concat()
+                                        .to_vec();
+                                };
                                 // call the pitchtracker
                                 self.pitch_val = pitch::pitch(
                                     self.sample_rate,
-                                    &self.signals[i],
+                                    &slice,
                                     &mut self.detectors[(self.params.detector_size.value()
                                                          as usize
                                                          - MIN_DETECTOR_SIZE_POWER)],
@@ -540,7 +520,7 @@ impl Plugin for VoiceMaster {
                                     // let sign = if ratio > 1.0 { 1.0 } else { -1.0 };
                                     let sign = ratio > 1.0;
                                     let sp = ((change - self.params.ok_change.value())
-                                              * self.params.change_compression.value() as f32)
+                                        * self.params.change_compression.value() as f32)
                                         + self.params.ok_change.value();
                                     let ratioo = if sign {
                                         1.0 + sp
@@ -549,7 +529,6 @@ impl Plugin for VoiceMaster {
                                         1.0 - sp
                                         // (1.0 - sp).max(0.0-self.params.max_change.value())
                                     };
-
 
                                     if change > self.params.ok_change.value() {
                                         // update the pitches
@@ -573,7 +552,6 @@ impl Plugin for VoiceMaster {
                                             // ratioo,
                                             // );
                                         };
-
                                     } else {
                                         // update the pitches
                                         self.pitches[self.median_index] = self.pitch_val[0];
@@ -593,8 +571,9 @@ impl Plugin for VoiceMaster {
                                 // sort the copy
                                 sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
                                 // get the middle one
-                                // self.final_pitch = sorted[sorted.len() / 2];
-                                self.final_pitch = self.pitches.iter().sum::<f32>()/self.params.median_nr.value() as f32;
+                                self.final_pitch = sorted[sorted.len() / 2];
+                                // self.final_pitch = self.pitches.iter().sum::<f32>()
+                                // / self.params.median_nr.value() as f32;
                                 // self.final_pitch = self.pitches[self.median_index];
                                 self.previous_pitch = self.final_pitch;
                                 // nih_trace!("pitch: {}", self.final_pitch);
@@ -633,8 +612,8 @@ impl Plugin for VoiceMaster {
             }
         }
 
-        fn staggered_index(i: usize, index: usize, len: usize) -> usize {
-            (index + (i * (len / OVERLAP))) % len
+        fn staggered_index(i: usize, index: usize, size: usize) -> usize {
+            (index + (i * (size / OVERLAP))) % size
         }
 
         ProcessStatus::Normal
