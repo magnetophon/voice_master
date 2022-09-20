@@ -448,8 +448,6 @@ impl Plugin for VoiceMaster {
             self.median_index = self.median_index % self.params.median_nr.value() as usize;
         }
 
-        // let len = self.signals[0].len();
-
         // set the filter frequencies
         self.eq
             .set(0, Curve::Highpass, self.params.hp_freq.value(), 1.0, 0.0);
@@ -476,7 +474,7 @@ impl Plugin for VoiceMaster {
                         // apply the filters to a copy of the sample
                         // we don't want to filter the main audio output, just the pitch detector input
                         let mut sample_filtered = *sample;
-                        sample_filtered = self.eq.process(sample_filtered);
+                        // sample_filtered = self.eq.process(sample_filtered);
 
                         // copy our filtered sample to signal
                         self.signal[signal_index] = sample_filtered as f32;
