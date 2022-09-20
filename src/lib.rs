@@ -13,7 +13,7 @@ mod pitch;
 //
 // remove the 32 copies and just use one writepointer and 32 read pointers
 // make than nr variable
-// make thar variable dependent on detector-size, so we  always get the same nr of pitches per second
+// make that variable dependent on detector-size, so we  always get the same nr of pitches per second
 //
 // compare pitch trackers:
 // https://docs.rs/pyin/1.0.2/pyin/
@@ -60,11 +60,10 @@ const MAX_DETECTOR_SIZE_POWER: usize = 13;
 /// the number of detectors we need, one for each size
 const NR_OF_DETECTORS: usize = MAX_DETECTOR_SIZE_POWER - MIN_DETECTOR_SIZE_POWER + 1;
 const MAX_SIZE: usize = 2_usize.pow(MAX_DETECTOR_SIZE_POWER as u32);
-/// the nr of times the detector is updated each DETECTOR_SIZE samples
-// TODO: make variable?
-const OVERLAP: usize = 32;
+/// the maximum nr of times the detector is updated each 2048 samples
+const MAX_OVERLAP: usize = 128;
 /// The median is taken from at max this nr of pitches
-const MAX_MEDIAN_NR: usize = OVERLAP;
+const MAX_MEDIAN_NR: usize = MAX_OVERLAP;
 const MEDIAN_NR_DEFAULT: i32 = 1;
 
 /// This is mostly identical to the gain example, minus some fluff, and with a GUI.
@@ -121,6 +120,8 @@ struct VoiceMasterParams {
     #[id = "detector_size"]
     pub detector_size: IntParam,
 
+    #[id = "overlap"]
+    pub overlap: IntParam,
     // pub(crate) fn pitch(sample_rate: f32, signal: &Vec<f32>) -> [f32; 2] {
     // Include only notes that exceed a power threshold which relates to the
     // amplitude of frequencies in the signal. Use the suggested default
@@ -228,6 +229,16 @@ impl Default for VoiceMasterParams {
             .with_value_to_string(formatters::v2s_i32_power_of_two())
             .with_string_to_value(formatters::s2v_i32_power_of_two()),
 
+            overlap: IntParam::new(
+                "Overlap",
+                32,
+                IntRange::Linear {
+                    min: 1,
+                    max: MAX_OVERLAP as i32,
+                },
+            )
+            .with_unit(" times/2048"),
+
             power_threshold: FloatParam::new(
                 "Power Threshold",
                 1.0,
@@ -274,7 +285,7 @@ impl Default for VoiceMasterParams {
             .with_unit(" Hz"),
             max_pitch: FloatParam::new(
                 "Maximum Pitch",
-                // F6, max 
+                // F6, max pitch of Freddy Mercury
                 1396.91,
                 FloatRange::Skewed {
                     // A2
@@ -419,6 +430,7 @@ impl Plugin for VoiceMaster {
     ) -> ProcessStatus {
         let mut channel_counter = 0;
         let size = 2_usize.pow((self.params.detector_size.value() as usize) as u32);
+        let overlap = self.params.overlap.value() as usize * size / 2048;
 
         // set the latency, cannot do that from a callback
         if self.params.latency.value() {
@@ -477,11 +489,11 @@ impl Plugin for VoiceMaster {
                         // update the index
                         self.signal_index = (self.signal_index + 1) % MAX_SIZE;
 
-                        // do OVERLAP nr of times:
-                        for i in 0..OVERLAP {
+                        // do overlap nr of times:
+                        for i in 0..overlap {
                             // if index[i] == 0
                             // so IOW: when the buffer is full
-                            if staggered_index(i, self.signal_index, size) == 0 {
+                            if staggered_index(i, self.signal_index, size, overlap) == 0 {
                                 // [ &v[..3], &v[l - 3..]].concat()
                                 let index_plus_size = (signal_index + size) % MAX_SIZE;
                                 let mut slice = vec![0.0; MAX_SIZE];
@@ -492,16 +504,16 @@ impl Plugin for VoiceMaster {
                                         &self.signal[signal_index..],
                                         &self.signal[..index_plus_size],
                                     ]
-                                        .concat()
-                                        .to_vec();
+                                    .concat()
+                                    .to_vec();
                                 };
                                 // call the pitchtracker
                                 self.pitch_val = pitch::pitch(
                                     self.sample_rate,
                                     &slice,
                                     &mut self.detectors[(self.params.detector_size.value()
-                                                         as usize
-                                                         - MIN_DETECTOR_SIZE_POWER)],
+                                        as usize
+                                        - MIN_DETECTOR_SIZE_POWER)],
                                     self.params.power_threshold.value(),
                                     // clarity_threshold: use 0.0, so all pitch values are let trough
                                     0.0,
@@ -612,8 +624,8 @@ impl Plugin for VoiceMaster {
             }
         }
 
-        fn staggered_index(i: usize, index: usize, size: usize) -> usize {
-            (index + (i * (size / OVERLAP))) % size
+        fn staggered_index(i: usize, index: usize, size: usize, overlap: usize) -> usize {
+            (index + (i * (size / overlap))) % size
         }
 
         ProcessStatus::Normal
