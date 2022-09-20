@@ -11,6 +11,42 @@ use simple_eq::design::Curve;
 mod editor;
 mod pitch;
 
+// TODO:
+//
+// remove the 32 copies and just use one writepointer and 32 read pointers
+// make than nr variable
+// make thar variable dependent on detector-size, so we  always get the same nr of pitches per second
+//
+// compare pitch trackers:
+// https://docs.rs/pyin/1.0.2/pyin/
+// https://crates.io/crates/irapt
+// https://crates.io/crates/tdpsola/
+// https://crates.io/crates/pitch
+// https://crates.io/crates/vox_box
+// https://crates.io/crates/pitch-detector
+// https://crates.io/crates/pitch-detection
+//
+// https://github.com/sevagh/pitch-detection/issues/63
+// https://github.com/marl/crepe
+// https://github.com/sevagh/pitch-detection/tree/master/misc/probabilistic-mcleod
+// https://www.eecs.qmul.ac.uk/~simond/pub/2014/MauchDixon-PYIN-ICASSP2014.pdf
+
+// add pitch override options:
+//
+// override kind param:
+//   - no override
+//   - use last pitch
+//   - use midi input
+//
+// for the vibrato during hold, add an LFO that get's it's pitch from
+// a separte pitchtracker that works as follows:
+//  - plot the ratio between pitch and avg pitch, track the pitch of that plot
+//  - avg pitch is calculated:
+//    - make a ringbuf for each note we want to track
+//    - for each note:
+//    - if ( abs_diff(i) < 1  )
+//        add note to ringbuf[i]
+
 /// The time it takes for the peak meter to decay by 12 dB after switching to complete silence.
 const PEAK_METER_DECAY_MS: f64 = 150.0;
 
