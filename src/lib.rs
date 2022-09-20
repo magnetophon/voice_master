@@ -175,7 +175,7 @@ impl Default for VoiceMaster {
             signals: Default::default(),
             signal_index: 0,
             pitch_val: [-1.0, 0.0],
-            pitches: Default::default(),
+            pitches: vec![0.0;MAX_MEDIAN_NR],
             median_index: 0,
             previous_saw: 0.0,
             previous_pitch: -1.0,
@@ -302,7 +302,7 @@ impl Default for VoiceMasterParams {
                 82.407,
                 FloatRange::Skewed {
                     // A0:
-                    min: 0.1,
+                    min: 10.0,
                     // D5, min of picolo flute
                     max: 587.33,
                     factor: FloatRange::skew_factor(-1.0),
@@ -311,7 +311,7 @@ impl Default for VoiceMasterParams {
             // .with_callback({
             // self.updateHP = true;
             // })
-                .with_smoother(SmoothingStyle::Logarithmic(50.0))
+            // .with_smoother(SmoothingStyle::Logarithmic(50.0))
                 .with_unit(" Hz"),
             lp_freq: FloatParam::new(
                 "Low Pass Frequency",
@@ -328,7 +328,7 @@ impl Default for VoiceMasterParams {
             // .with_callback({
             // self.updateLP = true;
             // })
-                .with_smoother(SmoothingStyle::Logarithmic(50.0))
+            // .with_smoother(SmoothingStyle::Logarithmic(50.0))
                 .with_unit(" Hz"),
 
             ok_change: FloatParam::new(
@@ -448,7 +448,7 @@ impl Plugin for VoiceMaster {
             }
         }
 
-        // set the latency, cannot do that fro a callback
+        // set the latency, cannot do that from a callback
         if self.params.latency.value() {
             context.set_latency_samples(size as u32);
         } else {
@@ -466,6 +466,9 @@ impl Plugin for VoiceMaster {
 
         let len = self.signals[0].len();
 
+        // set the filter frequencies
+        self.eq.set(0, Curve::Highpass, self.params.hp_freq.value(), 1.0, 0.0);
+        self.eq.set(1, Curve::Lowpass, self.params.lp_freq.value(), 1.0, 0.0);
 
 
         for channel_samples in buffer.iter_samples() {
@@ -473,11 +476,6 @@ impl Plugin for VoiceMaster {
             let num_samples = channel_samples.len();
 
             let gain = self.params.gain.smoothed.next();
-            // set the filter frequencies
-            self.eq.set(0, Curve::Highpass, self.params.hp_freq.smoothed.next(), 1.0, 0.0);
-            self.eq.set(1, Curve::Lowpass, self.params.lp_freq.smoothed.next(), 1.0, 0.0);
-            // self.eq.set(0, Curve::Highpass, 220.0, 1.0, 0.0);
-            // self.eq.set(1, Curve::Lowpass, 440.0, 1.0, 0.0);
 
             for sample in channel_samples {
                 // which of the 3 channels are we on
@@ -547,10 +545,10 @@ impl Plugin for VoiceMaster {
                                     let ratioo = if sign {
                                         1.0 + sp
                                         // (1.0 + sp).min(self.params.max_change.value())
-                                        } else {
+                                    } else {
                                         1.0 - sp
                                         // (1.0 - sp).max(0.0-self.params.max_change.value())
-                                        };
+                                    };
 
 
                                     if change > self.params.ok_change.value() {
