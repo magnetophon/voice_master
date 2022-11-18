@@ -1,7 +1,9 @@
 use atomic_float::AtomicF32;
+use ndarray::prelude::*;
 use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
 use pitch_detection::detector::mcleod::McLeodDetector;
+use pyin::{PYINExecutor, PadMode};
 use simple_eq::design::Curve;
 use simple_eq::*;
 use std::sync::Arc;
@@ -100,6 +102,7 @@ pub struct VoiceMaster {
     final_pitch: f32,
     /// an array of pitch detectors, one for each size:
     detectors: [McLeodDetector<f32>; NR_OF_DETECTORS],
+    pyin_exec: [PYINExecutor<f32>; NR_OF_DETECTORS],
     eq: Equalizer<f32>,
 }
 
@@ -189,6 +192,16 @@ impl Default for VoiceMaster {
                 McLeodDetector::new(2, 1),
                 McLeodDetector::new(2, 1),
                 McLeodDetector::new(2, 1),
+            ],
+            pyin_exec: [
+                PYINExecutor::new(0.0, 0.0, 0, 2, None, None, None),
+                PYINExecutor::new(0.0, 0.0, 0, 2, None, None, None),
+                PYINExecutor::new(0.0, 0.0, 0, 2, None, None, None),
+                PYINExecutor::new(0.0, 0.0, 0, 2, None, None, None),
+                PYINExecutor::new(0.0, 0.0, 0, 2, None, None, None),
+                PYINExecutor::new(0.0, 0.0, 0, 2, None, None, None),
+                PYINExecutor::new(0.0, 0.0, 0, 2, None, None, None),
+                PYINExecutor::new(0.0, 0.0, 0, 2, None, None, None),
             ],
             eq: Equalizer::new(48000.0),
         }
@@ -410,15 +423,24 @@ impl Plugin for VoiceMaster {
         // create an EQ for a given sample rate
         self.eq = Equalizer::new(self.sample_rate as f32);
 
-        // init signal with the max size
-        // self.signal.resize(MAX_SIZE, 0.0);
+        // pYin: None to use default values
+        let (win_length, hop_length, resolution) = (None, None, None);
+        let fmin = 60f64; // minimum frequency in Hz
+        let fmax = 600f64; // maximum frequency in Hz
+        let sr = 48000; // sampling rate of audio data in Hz
+        let frame_length = 2048; // frame length in samples
+        let pad_mode = PadMode::Constant(0.); // Zero-padding is applied on both sides of the signal. (only if cetner is true)
+
         for i in 0..NR_OF_DETECTORS {
             // let size = 2^i;
             let size = 2_usize.pow((i + MIN_DETECTOR_SIZE_POWER) as u32);
             let padding = size / 2;
             self.detectors[i] = McLeodDetector::new(size, padding);
             // println!("i: {}, pow: {}, size: {}",i, i+MIN_DETECTOR_SIZE_POWER, size)
+            self.pyin_exec[i] =
+                PYINExecutor::new(fmin, fmax, sr, size, win_length, hop_length, resolution);
         }
+
         true
     }
 
@@ -506,22 +528,42 @@ impl Plugin for VoiceMaster {
                                     .to_vec();
                                 };
                                 // call the pitchtracker
-                                self.pitch_val = pitch::pitch(
-                                    self.sample_rate,
-                                    &slice,
-                                    &mut self.detectors[(self.params.detector_size.value()
-                                        as usize
-                                        - MIN_DETECTOR_SIZE_POWER)],
-                                    self.params.power_threshold.value(),
-                                    // clarity_threshold: use 0.0, so all pitch values are let trough
-                                    0.0,
-                                    self.params.pick_threshold.value(),
-                                );
+                                // self.pitch_val = pitch::pitch(
+                                //     self.sample_rate,
+                                //     &slice,
+                                //     &mut self.detectors[(self.params.detector_size.value()
+                                //         as usize
+                                //         - MIN_DETECTOR_SIZE_POWER)],
+                                //     self.params.power_threshold.value(),
+                                //     // clarity_threshold: use 0.0, so all pitch values are let trough
+                                //     0.0,
+                                //     self.params.pick_threshold.value(),
+                                // );
+                                // let wav: CowArray<f64, Ix1> = ...;
+                                let fill_unvoiced = -1.0f64;
+                                let center = true; // If true, the first sample in wav becomes the center of the first frame.
+                                let pad_mode = PadMode::Constant(0.); // Zero-padding is applied on both sides of the signal. (only if cetner is true)
+                                let array = Array::from_vec(slice);
+
+                                // f0 (Array1<f64>) contains the pitch estimate in Hz. (NAN if unvoiced)
+                                // voiced_flag (Array1<bool>) contains whether the frame is voiced or not.
+                                // voiced_prob (Array1<f64>) contains the probability of the frame is voiced.
+                                let (f0, voiced_flag, voiced_prob) =
+                                    self.pyin_exec[(self.params.detector_size.value() as usize
+                                        - MIN_DETECTOR_SIZE_POWER)]
+                                        .pyin(
+                                            array,
+                                            0.0,
+                                            pad_mode
+                                        );
+                                // call the pitchtracker
+                                self.pitch_val = [f0, voiced_prob];
+                                //-> (Array1<A>, Array1<bool>, Array1<A>)
                                 // if clarity is high enough
                                 if self.pitch_val[1] > self.params.clarity_threshold.value()
                                 // and the pitch isn't too low or too high
-                                    && self.pitch_val[0] > self.params.min_pitch.value()
-                                    && self.pitch_val[0] < self.params.max_pitch.value()
+                                            && self.pitch_val[0] > self.params.min_pitch.value()
+                                            && self.pitch_val[0] < self.params.max_pitch.value()
                                 {
                                     let ratio = self.previous_pitch / self.pitch_val[0];
                                     let change = (ratio - 1.0).abs();
@@ -544,8 +586,8 @@ impl Plugin for VoiceMaster {
                                         // update the pitches
 
                                         self.pitches[self.median_index] =
-                                        // (ratioo) * self.pitch_val[0];
-                                            self.previous_pitch / ratioo;
+                                                // (ratioo) * self.pitch_val[0];
+                                                    self.previous_pitch / ratioo;
                                         // update the ringbuf pointer
                                         self.median_index = (self.median_index + 1)
                                             % (self.params.median_nr.value() as usize);
@@ -599,7 +641,7 @@ impl Plugin for VoiceMaster {
                     // clarity:
                     2 => *sample = self.pitch_val[1],
                     // never happens:
-                    _ => nih_trace!("Why are we here?"),
+                    _ => panic!("Why are we here?"),
                 }
                 // next channel
                 channel_counter = (channel_counter + 1) % Self::DEFAULT_OUTPUT_CHANNELS;

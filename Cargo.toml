@@ -29,8 +29,11 @@ atomic_float = "0.1"
 # pitch-detection = "0.3.0"
 
 pitch-detection = { git = "https://github.com/magnetophon/pitch-detection.git" }
+pyin = "1.0"
+ndarray = "0.15"
 
 simple-eq = { git = "https://github.com/m-hilgendorf/simple-eq.git" }
+
 
 # [patch]
 # [patch.'https://github.com/magnetophon/pitch-detection']
