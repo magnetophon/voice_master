@@ -5,11 +5,11 @@ let
 in with nixpkgs;
   stdenv.mkDerivation {
     name = "moz_overlay_shell";
-    nativeBuildInputs = [ pkgconfig clang lld ];
+    nativeBuildInputs = [ pkg-config clang lld ];
     buildInputs = [
       (nixpkgs.rustChannelOf { date = "2022-07-02"; channel = "nightly"; }).rust
       rustup
-      pkgconfig
+      pkg-config
 
       libjack2
       alsa-lib
