@@ -3,7 +3,7 @@ use ndarray::prelude::*;
 use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
 use pitch_detection::detector::mcleod::McLeodDetector;
-use pyin::{PYINExecutor, PadMode};
+use pyin::{PYINExecutor, PadMode, Framing};
 use simple_eq::design::Curve;
 use simple_eq::*;
 use std::sync::Arc;
@@ -194,14 +194,14 @@ impl Default for VoiceMaster {
                 McLeodDetector::new(2, 1),
             ],
             pyin_exec: [
-                PYINExecutor::new(0.0, 0.0, 0, 2, None, None, None),
-                PYINExecutor::new(0.0, 0.0, 0, 2, None, None, None),
-                PYINExecutor::new(0.0, 0.0, 0, 2, None, None, None),
-                PYINExecutor::new(0.0, 0.0, 0, 2, None, None, None),
-                PYINExecutor::new(0.0, 0.0, 0, 2, None, None, None),
-                PYINExecutor::new(0.0, 0.0, 0, 2, None, None, None),
-                PYINExecutor::new(0.0, 0.0, 0, 2, None, None, None),
-                PYINExecutor::new(0.0, 0.0, 0, 2, None, None, None),
+                PYINExecutor::new(61.0, 601.0, 48000, 1024, None, None, None),
+                PYINExecutor::new(61.0, 601.0, 48000, 1024, None, None, None),
+                PYINExecutor::new(61.0, 601.0, 48000, 1024, None, None, None),
+                PYINExecutor::new(61.0, 601.0, 48000, 1024, None, None, None),
+                PYINExecutor::new(61.0, 601.0, 48000, 1024, None, None, None),
+                PYINExecutor::new(61.0, 601.0, 48000, 1024, None, None, None),
+                PYINExecutor::new(61.0, 601.0, 48000, 1024, None, None, None),
+                PYINExecutor::new(61.0, 601.0, 48000, 1024, None, None, None),
             ],
             eq: Equalizer::new(48000.0),
         }
@@ -427,8 +427,8 @@ impl Plugin for VoiceMaster {
         let (win_length, hop_length, resolution) = (None, None, None);
         let fmin = 60f64; // minimum frequency in Hz
         let fmax = 600f64; // maximum frequency in Hz
-        let sr = 48000; // sampling rate of audio data in Hz
-        let frame_length = 2048; // frame length in samples
+        let sr = 48000u32; // sampling rate of audio data in Hz
+        let frame_length = 2048usize; // frame length in samples
         let pad_mode = PadMode::Constant(0.); // Zero-padding is applied on both sides of the signal. (only if cetner is true)
 
         for i in 0..NR_OF_DETECTORS {
@@ -436,9 +436,16 @@ impl Plugin for VoiceMaster {
             let size = 2_usize.pow((i + MIN_DETECTOR_SIZE_POWER) as u32);
             let padding = size / 2;
             self.detectors[i] = McLeodDetector::new(size, padding);
-            // println!("i: {}, pow: {}, size: {}",i, i+MIN_DETECTOR_SIZE_POWER, size)
+            println!("i: {}, pow: {}, size: {}",i, i+MIN_DETECTOR_SIZE_POWER, size);
+            // let min_period = ((sr as f64 / fmax).floor() as usize).max(1);
+            // let max_period = ((sr as f64 / fmin).ceil() as usize).min(frame_length - win_length - 1);
+            // if max_period - min_period < 2 {
+            // panic!("min(ceil(sr / fmin), (frame_length - win_length - 1)) + 2 < floor(sr / fmax) should be satisfied!");
+
+            // println!("fmin: {}, fmax: {}, sr: {}",fmin, fmax, sr);
             self.pyin_exec[i] =
-                PYINExecutor::new(fmin, fmax, sr, size, win_length, hop_length, resolution);
+            // PYINExecutor::new(fmin, fmax, sr, size, win_length, hop_length, resolution);
+                PYINExecutor::new(600.0, 6000.0, sr, size, win_length, hop_length, resolution);
         }
 
         true
@@ -455,11 +462,11 @@ impl Plugin for VoiceMaster {
         let overlap = self.params.overlap.value() as usize * size / 2048;
 
         // set the latency, cannot do that from a callback
-        if self.params.latency.value() {
-            context.set_latency_samples(size as u32);
-        } else {
-            context.set_latency_samples(0);
-        }
+        // if self.params.latency.value() {
+        // context.set_latency_samples(size as u32);
+        // } else {
+        // context.set_latency_samples(0);
+        // }
 
         // if there is a new median_nr value
         if self.pitches.len() != (self.params.median_nr.value() as usize) {
@@ -501,10 +508,10 @@ impl Plugin for VoiceMaster {
                         // copy our filtered sample to signal
                         self.signal[signal_index] = sample_filtered as f32;
                         // if the user chooses to sync up the audio with the pitch
-                        if self.params.latency.value() {
-                            // delay our sample
-                            *sample = self.delay_line[(signal_index - size) % MAX_SIZE];
-                        }
+                        // if self.params.latency.value() {
+                        //     // delay our sample
+                        //     *sample = self.delay_line[(signal_index - size) % MAX_SIZE];
+                        // }
 
                         // update the index
                         self.signal_index = (self.signal_index + 1) % MAX_SIZE;
@@ -540,10 +547,11 @@ impl Plugin for VoiceMaster {
                                 //     self.params.pick_threshold.value(),
                                 // );
                                 // let wav: CowArray<f64, Ix1> = ...;
-                                let fill_unvoiced = -1.0f64;
+                                let fill_unvoiced = -1.0f32;
+                                let framing:Framing<f32> = Framing::Valid;
                                 let center = true; // If true, the first sample in wav becomes the center of the first frame.
                                 let pad_mode = PadMode::Constant(0.); // Zero-padding is applied on both sides of the signal. (only if cetner is true)
-                                let array = Array::from_vec(slice);
+                                let array = CowArray::from(Array::from_vec(slice));
 
                                 // f0 (Array1<f64>) contains the pitch estimate in Hz. (NAN if unvoiced)
                                 // voiced_flag (Array1<bool>) contains whether the frame is voiced or not.
@@ -553,11 +561,11 @@ impl Plugin for VoiceMaster {
                                         - MIN_DETECTOR_SIZE_POWER)]
                                         .pyin(
                                             array,
-                                            0.0,
-                                            pad_mode
+                                            fill_unvoiced,
+                                            framing
                                         );
                                 // call the pitchtracker
-                                self.pitch_val = [f0, voiced_prob];
+                                self.pitch_val = [f0.to_vec()[0], voiced_prob.to_vec()[0]];
                                 //-> (Array1<A>, Array1<bool>, Array1<A>)
                                 // if clarity is high enough
                                 if self.pitch_val[1] > self.params.clarity_threshold.value()
