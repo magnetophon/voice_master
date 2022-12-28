@@ -1,0 +1,100 @@
+<!DOCTYPE patchbay>
+<patchbay name="test_patchbay" version="0.9.7">
+ <output-sockets>
+  <socket exclusive="off" client="Comet\ Lake\ PCH\-LP\ cAVS\ Digital\ Microphone" type="jack-audio" name="Comet Lake PCH-LP cAVS Digital Microphone">
+   <plug>capture_FL</plug>
+   <plug>capture_FR</plug>
+  </socket>
+  <socket exclusive="off" client="Comet\ Lake\ PCH\-LP\ cAVS\ Headphones\ Stereo\ Microphone" type="jack-audio" name="Comet Lake PCH-LP cAVS Headphones Stereo Microphone">
+   <plug>capture_FL</plug>
+   <plug>capture_FR</plug>
+  </socket>
+  <socket exclusive="off" client="mpv" type="jack-audio" name="mpv">
+   <plug>out_0</plug>
+   <plug>out_1</plug>
+  </socket>
+  <socket exclusive="off" client="Voice\ Master" type="jack-audio" name="Voice Master">
+   <plug>output_1</plug>
+   <plug>output_2</plug>
+   <plug>output_3</plug>
+  </socket>
+  <socket exclusive="off" client="FOFvocoderSlave" type="jack-audio" name="FOFvocoderSlave">
+   <plug>out_0</plug>
+   <plug>out_1</plug>
+  </socket>
+  <socket exclusive="off" client="Simple\ Scope\ \(4\ channel\)" type="jack-audio" name="Simple Scope (4 channel)">
+   <plug>out1</plug>
+   <plug>out2</plug>
+   <plug>out3</plug>
+   <plug>out4</plug>
+  </socket>
+  <socket exclusive="off" client="Comet\ Lake\ PCH\-LP\ cAVS\ Speaker\ \+\ Headphones\ Monitor" type="jack-audio" name="Comet Lake PCH-LP cAVS Speaker + Headphones Monitor">
+   <plug>monitor_FL</plug>
+   <plug>monitor_FR</plug>
+  </socket>
+  <socket exclusive="off" client="Comet\ Lake\ PCH\-LP\ cAVS\ HDMI\ \/\ DisplayPort\ 1\ Output\ Monitor" type="jack-audio" name="Comet Lake PCH-LP cAVS HDMI / DisplayPort 1 Output Monitor">
+   <plug>monitor_FL</plug>
+   <plug>monitor_FR</plug>
+  </socket>
+  <socket exclusive="off" client="Comet\ Lake\ PCH\-LP\ cAVS\ HDMI\ \/\ DisplayPort\ 2\ Output\ Monitor" type="jack-audio" name="Comet Lake PCH-LP cAVS HDMI / DisplayPort 2 Output Monitor">
+   <plug>monitor_FL</plug>
+   <plug>monitor_FR</plug>
+  </socket>
+  <socket exclusive="off" client="Comet\ Lake\ PCH\-LP\ cAVS\ HDMI\ \/\ DisplayPort\ 3\ Output\ Monitor" type="jack-audio" name="Comet Lake PCH-LP cAVS HDMI / DisplayPort 3 Output Monitor">
+   <plug>monitor_FL</plug>
+   <plug>monitor_FR</plug>
+  </socket>
+  <socket exclusive="off" client="Midi\-Bridge" type="jack-midi" name="Midi-Bridge">
+   <plug>Midi\ Through\:\(capture_0\)\ Midi\ Through\ Port\-0</plug>
+  </socket>
+  <socket exclusive="off" client="Midi\ Through" type="alsa-midi" name="Midi Through">
+   <plug>Midi\ Through\ Port\-0</plug>
+  </socket>
+ </output-sockets>
+ <input-sockets>
+  <socket exclusive="off" client="Comet\ Lake\ PCH\-LP\ cAVS\ Speaker\ \+\ Headphones" type="jack-audio" name="Comet Lake PCH-LP cAVS Speaker + Headphones">
+   <plug>playback_FL</plug>
+   <plug>playback_FR</plug>
+  </socket>
+  <socket exclusive="off" client="Comet\ Lake\ PCH\-LP\ cAVS\ HDMI\ \/\ DisplayPort\ 1\ Output" type="jack-audio" name="Comet Lake PCH-LP cAVS HDMI / DisplayPort 1 Output">
+   <plug>playback_FL</plug>
+   <plug>playback_FR</plug>
+  </socket>
+  <socket exclusive="off" client="Comet\ Lake\ PCH\-LP\ cAVS\ HDMI\ \/\ DisplayPort\ 2\ Output" type="jack-audio" name="Comet Lake PCH-LP cAVS HDMI / DisplayPort 2 Output">
+   <plug>playback_FL</plug>
+   <plug>playback_FR</plug>
+  </socket>
+  <socket exclusive="off" client="Comet\ Lake\ PCH\-LP\ cAVS\ HDMI\ \/\ DisplayPort\ 3\ Output" type="jack-audio" name="Comet Lake PCH-LP cAVS HDMI / DisplayPort 3 Output">
+   <plug>playback_FL</plug>
+   <plug>playback_FR</plug>
+  </socket>
+  <socket exclusive="off" client="Voice\ Master" type="jack-audio" name="Voice Master">
+   <plug>input_1</plug>
+  </socket>
+  <socket exclusive="off" client="FOFvocoderSlave" type="jack-audio" name="FOFvocoderSlave">
+   <plug>in_0</plug>
+   <plug>in_1</plug>
+   <plug>in_2</plug>
+  </socket>
+  <socket exclusive="off" client="Simple\ Scope\ \(4\ channel\)" type="jack-audio" name="Simple Scope (4 channel)">
+   <plug>in1</plug>
+   <plug>in2</plug>
+   <plug>in3</plug>
+   <plug>in4</plug>
+  </socket>
+  <socket exclusive="off" client="Midi\-Bridge" type="jack-midi" name="Midi-Bridge">
+   <plug>Midi\ Through\:\(playback_0\)\ Midi\ Through\ Port\-0</plug>
+  </socket>
+  <socket exclusive="off" client="Midi\ Through" type="alsa-midi" name="Midi Through">
+   <plug>Midi\ Through\ Port\-0</plug>
+  </socket>
+ </input-sockets>
+ <slots/>
+ <cables>
+  <cable type="jack-audio" input="Voice Master" output="mpv"/>
+  <cable type="jack-audio" input="FOFvocoderSlave" output="Voice Master"/>
+  <cable type="jack-audio" input="Simple Scope (4 channel)" output="Voice Master"/>
+  <cable type="jack-audio" input="Comet Lake PCH-LP cAVS Speaker + Headphones" output="FOFvocoderSlave"/>
+ </cables>
+</patchbay>
+
