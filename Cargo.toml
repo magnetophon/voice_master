@@ -29,7 +29,9 @@ atomic_float = "0.1"
 # pitch-detection = "0.3.0"
 
 pitch-detection = { git = "https://github.com/magnetophon/pitch-detection.git" }
-pyin = "1.0"
+# pyin = "1.0"
+# pyin = "/home/bart/.cargo/registry/src/github.com-1ecc6299db9ec823/pyin-1.0.2/src/lib.rs"
+pyin = { path = "/home/bart/.cargo/registry/src/github.com-1ecc6299db9ec823/pyin-1.0.2" }
 ndarray = "0.15"
 
 simple-eq = { git = "https://github.com/m-hilgendorf/simple-eq.git" }

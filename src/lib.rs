@@ -2,8 +2,8 @@ use atomic_float::AtomicF32;
 use ndarray::prelude::*;
 use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
-use pitch_detection::detector::mcleod::McLeodDetector;
-use pyin::{PYINExecutor, PadMode, Framing};
+// use pitch_detection::detector::mcleod::McLeodDetector;
+use pyin::{PYINExecutor, Framing};
 use simple_eq::design::Curve;
 use simple_eq::*;
 use std::sync::Arc;
@@ -101,7 +101,7 @@ pub struct VoiceMaster {
     /// the final pitch that we are using
     final_pitch: f32,
     /// an array of pitch detectors, one for each size:
-    detectors: [McLeodDetector<f32>; NR_OF_DETECTORS],
+    // detectors: [McLeodDetector<f32>; NR_OF_DETECTORS],
     pyin_exec: [PYINExecutor<f32>; NR_OF_DETECTORS],
     eq: Equalizer<f32>,
 }
@@ -183,25 +183,25 @@ impl Default for VoiceMaster {
             final_pitch: 0.0,
             // they wil get the real size later
             // detectors: [McLeodDetector::new(2, 1);NR_OF_DETECTORS],
-            detectors: [
-                McLeodDetector::new(2, 1),
-                McLeodDetector::new(2, 1),
-                McLeodDetector::new(2, 1),
-                McLeodDetector::new(2, 1),
-                McLeodDetector::new(2, 1),
-                McLeodDetector::new(2, 1),
-                McLeodDetector::new(2, 1),
-                McLeodDetector::new(2, 1),
-            ],
+            // detectors: [
+            // McLeodDetector::new(2, 1),
+            // McLeodDetector::new(2, 1),
+            // McLeodDetector::new(2, 1),
+            // McLeodDetector::new(2, 1),
+            // McLeodDetector::new(2, 1),
+            // McLeodDetector::new(2, 1),
+            // McLeodDetector::new(2, 1),
+            // McLeodDetector::new(2, 1),
+            // ],
             pyin_exec: [
-                PYINExecutor::new(61.0, 601.0, 48000, 1024, None, None, None),
-                PYINExecutor::new(61.0, 601.0, 48000, 1024, None, None, None),
-                PYINExecutor::new(61.0, 601.0, 48000, 1024, None, None, None),
-                PYINExecutor::new(61.0, 601.0, 48000, 1024, None, None, None),
-                PYINExecutor::new(61.0, 601.0, 48000, 1024, None, None, None),
-                PYINExecutor::new(61.0, 601.0, 48000, 1024, None, None, None),
-                PYINExecutor::new(61.0, 601.0, 48000, 1024, None, None, None),
-                PYINExecutor::new(61.0, 601.0, 48000, 1024, None, None, None),
+                PYINExecutor::new(750.0,    1350.0, 48000, 64, None, None, None),
+                PYINExecutor::new(375.0,    1350.0, 48000, 128, None, None, None),
+                PYINExecutor::new(187.5,    1350.0, 48000, 256, None, None, None),
+                PYINExecutor::new(93.75,    1350.0, 48000, 512, None, None, None),
+                PYINExecutor::new(46.875,   1350.0, 48000, 1024, None, None, None),
+                PYINExecutor::new(23.4375,  1350.0, 48000, 2048, None, None, None),
+                PYINExecutor::new(11.71875, 1350.0, 48000, 4096, None, None, None),
+                PYINExecutor::new(5.859375, 1350.0, 48000, 8192, None, None, None),
             ],
             eq: Equalizer::new(48000.0),
         }
@@ -428,15 +428,15 @@ impl Plugin for VoiceMaster {
         let fmin = 60f64; // minimum frequency in Hz
         let fmax = 600f64; // maximum frequency in Hz
         let sr = 48000u32; // sampling rate of audio data in Hz
-        let frame_length = 2048usize; // frame length in samples
-        let pad_mode = PadMode::Constant(0.); // Zero-padding is applied on both sides of the signal. (only if cetner is true)
+        // let frame_length = 2048usize; // frame length in samples
+        // let pad_mode = PadMode::Constant(0.); // Zero-padding is applied on both sides of the signal. (only if cetner is true)
 
         for i in 0..NR_OF_DETECTORS {
             // let size = 2^i;
             let size = 2_usize.pow((i + MIN_DETECTOR_SIZE_POWER) as u32);
-            let padding = size / 2;
-            self.detectors[i] = McLeodDetector::new(size, padding);
-            println!("i: {}, pow: {}, size: {}",i, i+MIN_DETECTOR_SIZE_POWER, size);
+            // let padding = size / 2;
+            // self.detectors[i] = McLeodDetector::new(size, padding);
+            // println!("i: {}, pow: {}, size: {}",i, i+MIN_DETECTOR_SIZE_POWER, size);
             // let min_period = ((sr as f64 / fmax).floor() as usize).max(1);
             // let max_period = ((sr as f64 / fmin).ceil() as usize).min(frame_length - win_length - 1);
             // if max_period - min_period < 2 {
@@ -444,8 +444,8 @@ impl Plugin for VoiceMaster {
 
             // println!("fmin: {}, fmax: {}, sr: {}",fmin, fmax, sr);
             self.pyin_exec[i] =
-            // PYINExecutor::new(fmin, fmax, sr, size, win_length, hop_length, resolution);
-                PYINExecutor::new(600.0, 6000.0, sr, size, win_length, hop_length, resolution);
+                PYINExecutor::new(fmin, fmax, sr, size, win_length, hop_length, resolution);
+            // PYINExecutor::new(60.0, 6000.0, sr, size, win_length, hop_length, resolution);
         }
 
         true
@@ -549,8 +549,8 @@ impl Plugin for VoiceMaster {
                                 // let wav: CowArray<f64, Ix1> = ...;
                                 let fill_unvoiced = -1.0f32;
                                 let framing:Framing<f32> = Framing::Valid;
-                                let center = true; // If true, the first sample in wav becomes the center of the first frame.
-                                let pad_mode = PadMode::Constant(0.); // Zero-padding is applied on both sides of the signal. (only if cetner is true)
+                                // let center = true; // If true, the first sample in wav becomes the center of the first frame.
+                                // let pad_mode = PadMode::Constant(0.); // Zero-padding is applied on both sides of the signal. (only if cetner is true)
                                 let array = CowArray::from(Array::from_vec(slice));
 
                                 // f0 (Array1<f64>) contains the pitch estimate in Hz. (NAN if unvoiced)
@@ -565,7 +565,11 @@ impl Plugin for VoiceMaster {
                                             framing
                                         );
                                 // call the pitchtracker
+                                if voiced_flag.to_vec()[0] == true {
+                                    println!("clarity: {},   pitch: {}, voiced_flag: {}", voiced_prob.to_vec()[0] , f0.to_vec()[0] , voiced_flag.to_vec()[0]);
+                                };
                                 self.pitch_val = [f0.to_vec()[0], voiced_prob.to_vec()[0]];
+                                // println!("clarity: {},   pitch: {}", self.pitch_val[0],self.pitch_val[1]);
                                 //-> (Array1<A>, Array1<bool>, Array1<A>)
                                 // if clarity is high enough
                                 if self.pitch_val[1] > self.params.clarity_threshold.value()
