@@ -2227,6 +2227,8 @@ dependencies = [
 [[package]]
 name = "pyin"
 version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "63d8fccaed1c06cb300dc712969505a226611dfb9506edf540210ae8024c7151"
 dependencies = [
  "approx 0.5.1",
  "clap",
