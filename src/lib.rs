@@ -3,11 +3,17 @@ use ndarray::prelude::*;
 use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
 // use pitch_detection::detector::mcleod::McLeodDetector;
-use pyin::{Framing, PYINExecutor};
 use pyin::PadMode::Constant;
+use pyin::{Framing, PYINExecutor};
+
+use irapt::{Irapt, Parameters};
+use std::collections::VecDeque;
+
 use simple_eq::design::Curve;
 use simple_eq::*;
 use std::sync::Arc;
+
+use rubato::{FftFixedInOut,Resampler};
 
 mod editor;
 mod pitch;
@@ -79,7 +85,8 @@ const MAX_OVERLAP: usize = 128;
 /// The median is taken from at max this nr of pitches
 const MAX_MEDIAN_NR: usize = 32;
 const MEDIAN_NR_DEFAULT: i32 = 1;
-const DOWNSAMPLE_RATIO : usize = 8;
+const DOWNSAMPLE_RATIO: usize = 8;
+const DOWNSAMPLED_RATE: usize = 6000;
 
 /// This is mostly identical to the gain example, minus some fluff, and with a GUI.
 pub struct VoiceMaster {
@@ -116,7 +123,9 @@ pub struct VoiceMaster {
     /// an array of pitch detectors, one for each size:
     // detectors: [McLeodDetector<f32>; NR_OF_DETECTORS],
     pyin_exec: [PYINExecutor<f32>; NR_OF_DETECTORS],
+    irapt: Irapt,
     eq: Equalizer<f32>,
+    resampler: FftFixedInOut<f32>,
 }
 
 #[derive(Params)]
@@ -217,6 +226,26 @@ impl Default for VoiceMaster {
                 PYINExecutor::new(5.859375, 1350.0, 48000, 8192, None, None, None),
             ],
             eq: Equalizer::new(48000.0),
+
+            // let parameters = Parameters::default();
+
+            // irapt:  Irapt::new(Parameters::default().clone()),
+            // irapt:  Irapt { parameters: val, estimator: val, candidate_generator: val, candidate_selector: val },
+
+            // irapt: Irapt::new(irapt::Parameters {
+            // sample_rate: downsampled_rate,
+            // pitch_range: PITCH_RANGE,
+            // ..<_>::default()
+            // })
+            irapt: Irapt::new(Parameters::default().clone())
+                .expect("the default parameters should be valid"),
+            resampler: FftFixedInOut::<f32>::new(
+                48000,
+                DOWNSAMPLED_RATE,
+                2048,
+                1,
+
+            ).unwrap(),
         }
     }
 }
@@ -248,10 +277,10 @@ impl Default for VoiceMasterParams {
                     factor: FloatRange::gain_skew_factor(-30.0, 30.0),
                 },
             )
-            .with_smoother(SmoothingStyle::Logarithmic(50.0))
-            .with_unit(" dB")
-            .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
-            .with_string_to_value(formatters::s2v_f32_gain_to_db()),
+                .with_smoother(SmoothingStyle::Logarithmic(50.0))
+                .with_unit(" dB")
+                .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
+                .with_string_to_value(formatters::s2v_f32_gain_to_db()),
 
             detector_size: IntParam::new(
                 "Detector Size",
@@ -261,9 +290,9 @@ impl Default for VoiceMasterParams {
                     max: MAX_DETECTOR_SIZE_POWER as i32,
                 },
             )
-            .with_unit(" samples")
-            .with_value_to_string(formatters::v2s_i32_power_of_two())
-            .with_string_to_value(formatters::s2v_i32_power_of_two()),
+                .with_unit(" samples")
+                .with_value_to_string(formatters::v2s_i32_power_of_two())
+                .with_string_to_value(formatters::s2v_i32_power_of_two()),
 
             overlap: IntParam::new(
                 "Overlap",
@@ -273,7 +302,7 @@ impl Default for VoiceMasterParams {
                     max: MAX_OVERLAP as i32,
                 },
             )
-            .with_unit(" times/2048"),
+                .with_unit(" times/2048"),
 
             power_threshold: FloatParam::new(
                 "Power Threshold",
@@ -318,7 +347,7 @@ impl Default for VoiceMasterParams {
                     factor: FloatRange::skew_factor(-1.0),
                 },
             )
-            .with_unit(" Hz"),
+                .with_unit(" Hz"),
             max_pitch: FloatParam::new(
                 "Maximum Pitch",
                 // F6, max pitch of Freddy Mercury
@@ -331,7 +360,7 @@ impl Default for VoiceMasterParams {
                     factor: FloatRange::skew_factor(-1.0),
                 },
             )
-            .with_unit(" Hz"),
+                .with_unit(" Hz"),
 
             hp_freq: FloatParam::new(
                 "High Pass Frequency",
@@ -345,7 +374,7 @@ impl Default for VoiceMasterParams {
                     factor: FloatRange::skew_factor(-1.0),
                 },
             )
-            .with_unit(" Hz"),
+                .with_unit(" Hz"),
             lp_freq: FloatParam::new(
                 "Low Pass Frequency",
                 // A4, max male vocal pitch
@@ -358,7 +387,7 @@ impl Default for VoiceMasterParams {
                     factor: FloatRange::skew_factor(-1.0),
                 },
             )
-            .with_unit(" Hz"),
+                .with_unit(" Hz"),
 
             ok_change: FloatParam::new(
                 "OK Change Rate",
@@ -413,11 +442,13 @@ impl Plugin for VoiceMaster {
 
     const SAMPLE_ACCURATE_AUTOMATION: bool = true;
 
+    type BackgroundTask = ();
+
     fn params(&self) -> Arc<dyn Params> {
         self.params.clone()
     }
 
-    fn editor(&self) -> Option<Box<dyn Editor>> {
+    fn editor(&self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         editor::create(
             self.params.clone(),
             self.peak_meter.clone(),
@@ -434,7 +465,7 @@ impl Plugin for VoiceMaster {
         &mut self,
         _bus_config: &BusConfig,
         buffer_config: &BufferConfig,
-        _context: &mut impl InitContext,
+        _context: &mut impl InitContext<Self>,
     ) -> bool {
         // After `PEAK_METER_DECAY_MS` milliseconds of pure silence, the peak meter's value should
         // have dropped by 12 dB
@@ -447,29 +478,46 @@ impl Plugin for VoiceMaster {
         self.eq = Equalizer::new(self.sample_rate as f32);
 
         // pYin: None to use default values
-        let sr = self.sample_rate  as u32; // sampling rate of audio data in Hz
-        // let sr = (self.sample_rate / DOWNSAMPLE_RATIO as f32) as u32; // sampling rate of audio data in Hz
+        let sr = self.sample_rate as u32; // sampling rate of audio data in Hz
+                                          // let sr = (self.sample_rate / DOWNSAMPLE_RATIO as f32) as u32; // sampling rate of audio data in Hz
         let fmax = 1350.0f64; // maximum frequency in Hz
-        // let frame_length = 2048usize; // frame length in samples
-        // let pad_mode = PadMode::Constant(0.); // Zero-padding is applied on both sides of the signal. (only if cetner is true)
+                              // let frame_length = 2048usize; // frame length in samples
+                              // let pad_mode = PadMode::Constant(0.); // Zero-padding is applied on both sides of the signal. (only if cetner is true)
 
         for i in 0..NR_OF_DETECTORS {
             // let size = 2^i;
             let size = 2_usize.pow((i + MIN_DETECTOR_SIZE_POWER) as u32);
             let (win_length, hop_length, resolution) = (None, Some(size), None);
-            let fmin = (sr/size as u32) as f64; // minimum frequency in Hz
-            // let padding = size / 2;
-            // self.detectors[i] = McLeodDetector::new(size, padding);
-            // println!("i: {}, pow: {}, size: {}",i, i+MIN_DETECTOR_SIZE_POWER, size);
-            // let min_period = ((sr as f64 / fmax).floor() as usize).max(1);
-            // let max_period = ((sr as f64 / fmin).ceil() as usize).min(frame_length - win_length - 1);
-            // if max_period - min_period < 2 {
-            // panic!("min(ceil(sr / fmin), (frame_length - win_length - 1)) + 2 < floor(sr / fmax) should be satisfied!");
+            let fmin = (sr / size as u32) as f64; // minimum frequency in Hz
+                                                  // let padding = size / 2;
+                                                  // self.detectors[i] = McLeodDetector::new(size, padding);
+                                                  // println!("i: {}, pow: {}, size: {}",i, i+MIN_DETECTOR_SIZE_POWER, size);
+                                                  // let min_period = ((sr as f64 / fmax).floor() as usize).max(1);
+                                                  // let max_period = ((sr as f64 / fmin).ceil() as usize).min(frame_length - win_length - 1);
+                                                  // if max_period - min_period < 2 {
+                                                  // panic!("min(ceil(sr / fmin), (frame_length - win_length - 1)) + 2 < floor(sr / fmax) should be satisfied!");
 
             // println!("fmin: {}, fmax: {}, sr: {}",fmin, fmax, sr);
             self.pyin_exec[i] =
                 PYINExecutor::new(fmin, fmax, sr, size, win_length, hop_length, resolution);
             // PYINExecutor::new(60.0, 6000.0, sr, size, win_length, hop_length, resolution);
+
+            let parameters = Parameters::default();
+            self.irapt =
+            // Irapt::new(parameters.clone()).expect("the default parameters should be valid");
+                Irapt::new(irapt::Parameters {
+                    // sample_rate: 48000.0,
+                    sample_rate: DOWNSAMPLED_RATE as f64,
+                    // pitch_range: PITCH_RANGE,
+                    ..<_>::default()
+                }).expect("the default parameters should be valid");
+            self.resampler = FftFixedInOut::<f32>::new(
+                self.sample_rate as usize,
+                DOWNSAMPLED_RATE,
+                2048,
+                1,
+
+            ).unwrap();
         }
 
         true
@@ -479,7 +527,7 @@ impl Plugin for VoiceMaster {
         &mut self,
         buffer: &mut Buffer,
         _aux: &mut AuxiliaryBuffers,
-        context: &mut impl ProcessContext,
+        context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
         let mut channel_counter = 0;
         let size = 2_usize.pow((self.params.detector_size.value() as usize) as u32);
@@ -526,13 +574,13 @@ impl Plugin for VoiceMaster {
                         // apply the filters to a copy of the sample
                         // we don't want to filter the main audio output, just the pitch detector input
                         // let mut sample_filtered = *sample;
-                        let mut sample_filtered = self.eq.process(*sample);
+                        // let mut sample_filtered = self.eq.process(*sample);
 
-
-                        let mut downsampling_index = self.signal_index % DOWNSAMPLE_RATIO;
+                        // let mut downsampling_index = self.signal_index % DOWNSAMPLE_RATIO;
                         // copy our filtered sample to signal
                         // if downsampling_index == 0 {
-                        self.signal[self.signal_index] = sample_filtered as f32;
+                        self.signal[self.signal_index] = *sample;
+                        // self.signal[self.signal_index] = sample_filtered as f32;
                         // }
                         // if the user chooses to sync up the audio with the pitch
                         // if self.params.latency.value() {
@@ -542,6 +590,7 @@ impl Plugin for VoiceMaster {
 
                         // update the index
                         self.signal_index = (self.signal_index + 1) % MAX_SIZE;
+
 
                         // do overlap nr of times:
                         for i in 0..overlap {
@@ -555,8 +604,9 @@ impl Plugin for VoiceMaster {
                                 let index_plus_size = (self.signal_index + size) % MAX_SIZE;
                                 let mut slice = vec![0.0; MAX_SIZE];
                                 // if no wrap around:
-                                if (self.signal_index ) < index_plus_size {
-                                    slice = self.signal[self.signal_index..index_plus_size].to_vec();
+                                if (self.signal_index) < index_plus_size {
+                                    slice =
+                                        self.signal[self.signal_index..index_plus_size].to_vec();
                                     // if we do have a wrap around:
                                 } else {
                                     slice = [
@@ -566,6 +616,16 @@ impl Plugin for VoiceMaster {
                                         .concat()
                                         .to_vec();
                                 };
+
+                                // resample:
+                                // let resampled = self.resampler..resampler.process_into_buffer(&vec![slice;1], None).unwrap()[0].clone();
+                                // let resampled = self.resampler.process(&slice,None).unwrap();
+                                let resampled = self.resampler.process(&vec![slice;1],None).unwrap()[0].clone();
+                                let mut sample_buffer = VecDeque::from(resampled);
+                                // and uncomment this one:
+                                // let mut sample_buffer = VecDeque::from(slice);
+
+
                                 // call the pitchtracker
                                 // self.pitch_val = pitch::pitch(
                                 //     self.sample_rate,
@@ -584,38 +644,72 @@ impl Plugin for VoiceMaster {
                                 let framing: Framing<f32> = Framing::Center(Constant(0.0));
                                 // let center = true; // If true, the first sample in wav becomes the center of the first frame.
                                 // let pad_mode = PadMode::Constant(0.); // Zero-padding is applied on both sides of the signal. (only if cetner is true)
-                                let array = CowArray::from(Array::from_vec(slice));
+                                // let array = CowArray::from(Array::from_vec(slice));
+                                // let mut sample_buffer = VecDeque::from(slice);
 
                                 // f0 (Array1<f64>) contains the pitch estimate in Hz. (NAN if unvoiced)
                                 // voiced_flag (Array1<bool>) contains whether the frame is voiced or not.
                                 // voiced_prob (Array1<f64>) contains the probability of the frame is voiced.
-                                let (f0, voiced_flag, voiced_prob) =
-                                    self.pyin_exec[(self.params.detector_size.value() as usize
-                                                    - MIN_DETECTOR_SIZE_POWER)]
-                                    .pyin(array, fill_unvoiced, framing);
+
+                                // let (f0, voiced_flag, voiced_prob) =
+                                // self.pyin_exec[(self.params.detector_size.value() as usize
+                                // - MIN_DETECTOR_SIZE_POWER)]
+                                // .pyin(array, fill_unvoiced, framing);
+
                                 // call the pitchtracker
-                                if
-                                // voiced_flag.to_vec()[0] == true
-                                    voiced_prob.to_vec()[0] > 0.0
-                                    && f0.to_vec()[0] > (self.sample_rate/size as f32)
-                            {
-                                println!(
-                                    "clarity: {},   pitch: {}, voiced_flag: {}",
-                                    voiced_prob.to_vec()[0],
-                                    f0.to_vec()[0],
-                                    voiced_flag.to_vec()[0]
-                                );
-                            };
-                            if voiced_prob.to_vec()[0] > 0.0
-                                && f0.to_vec()[0] > (self.sample_rate/size as f32)
-                            {
-                                self.pitch_val = [f0.to_vec()[0], voiced_prob.to_vec()[0]];
-                            }
-                            // println!("clarity: {},   pitch: {}", self.pitch_val[0],self.pitch_val[1]);
-                            //-> (Array1<A>, Array1<bool>, Array1<A>)
-                            // if clarity is high enough
-                            if self.pitch_val[1] > self.params.clarity_threshold.value()
-                            // and the pitch isn't too low or too high
+
+                                let mut sample_index = 0;
+                                while let (initial_sample_buffer_len, Some(output)) =
+                                    (size, self.irapt.process(&mut sample_buffer))
+                                {
+                                    let estimated_pitch =
+                                        output.pitch_estimates().final_estimate();
+                                    if estimated_pitch.energy as f32
+                                        > self.params.clarity_threshold.value()
+                                    {
+                                        let estimated_pitch_index = (sample_index as isize
+                                                                     + estimated_pitch.offset)
+                                            as usize;
+                                        let estimated_pitch_time =
+                                            estimated_pitch_index as f32 / self.sample_rate;
+                                        println!(
+                                            "estimated pitch at {:0.3}: {}Hz with energy {}",
+                                            estimated_pitch_time,
+                                            estimated_pitch.frequency,
+                                            estimated_pitch.energy
+                                        );
+                                        sample_index +=
+                                            initial_sample_buffer_len - sample_buffer.len();
+                                        // self.pitch_val = [estimated_pitch.to_vec()[0], estimated_pitch.energy.to_vec()];
+                                        self.pitch_val = [
+                                            estimated_pitch.frequency as f32,
+                                            estimated_pitch.energy as f32,
+                                        ];
+                                    }
+                                }
+
+                                // if
+                                // voiced_prob.to_vec()[0] > 0.0
+                                // && f0.to_vec()[0] > (self.sample_rate/size as f32)
+                                // {
+                                // println!(
+                                // "clarity: {},   pitch: {}, voiced_flag: {}",
+                                // voiced_prob.to_vec()[0],
+                                // f0.to_vec()[0],
+                                // voiced_flag.to_vec()[0]
+                                // );
+                                // };
+
+                                // if voiced_prob.to_vec()[0] > 0.0
+                                // && f0.to_vec()[0] > (self.sample_rate/size as f32)
+                                // {
+                                // self.pitch_val = [f0.to_vec()[0], voiced_prob.to_vec()[0]];
+                                // }
+                                // println!("clarity: {},   pitch: {}", self.pitch_val[0],self.pitch_val[1]);
+                                //-> (Array1<A>, Array1<bool>, Array1<A>)
+                                // if clarity is high enough
+                                if self.pitch_val[1] > self.params.clarity_threshold.value()
+                                // and the pitch isn't too low or too high
                                     && self.pitch_val[0] > self.params.min_pitch.value()
                                     && self.pitch_val[0] < self.params.max_pitch.value()
                                 {
@@ -646,45 +740,45 @@ impl Plugin for VoiceMaster {
                                         self.median_index = (self.median_index + 1)
                                             % (self.params.median_nr.value() as usize);
                                         // self.previous_pitch = self.pitch_val[0];
-                                        if (ratio - ratioo).abs() > 0.05 {
-                                            // println!(
-                                            // "ratio: {} change: {} change-ok: {} sign: {} sp: {} ratioo: {}",
-                                            // ratio,
-                                            // change,
-                                            // change - self.params.ok_change.value()
-                                            // ,
-                                            // sign,
-                                            // sp,
-                                            // ratioo,
-                                            // );
-                                        };
-                                    } else {
-                                        // update the pitches
-                                        self.pitches[self.median_index] = self.pitch_val[0];
-                                        // update the ringbuf pointer
-                                        self.median_index = (self.median_index + 1)
-                                            % (self.params.median_nr.value() as usize);
-                                        // nih_trace!(
-                                        // "i: {}, Frequency: {}, Clarity: {}",
-                                        // i, self.pitch_val[0], self.pitch_val[1]
+                                    if (ratio - ratioo).abs() > 0.05 {
+                                        // println!(
+                                        // "ratio: {} change: {} change-ok: {} sign: {} sp: {} ratioo: {}",
+                                        // ratio,
+                                        // change,
+                                        // change - self.params.ok_change.value()
+                                        // ,
+                                        // sign,
+                                        // sp,
+                                        // ratioo,
                                         // );
                                     };
-                                    // self.previous_pitch = self.pitches[self.median_index];
-                                }
-                                // get the median pitch:
-                                // copy the pitches, we don't want to sort the ringbuffer
-                                let mut sorted: Vec<f32> = self.pitches.clone();
-                                // sort the copy
-                                sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                                // get the middle one
-                                self.final_pitch = sorted[sorted.len() / 2];
-                                // self.final_pitch = self.pitches.iter().sum::<f32>()
-                                // / self.params.median_nr.value() as f32;
-                                // self.final_pitch = self.pitches[self.median_index];
-                                self.previous_pitch = self.final_pitch;
-                                // nih_trace!("pitch: {}", self.final_pitch);
+                                } else {
+                                    // update the pitches
+                                    self.pitches[self.median_index] = self.pitch_val[0];
+                                    // update the ringbuf pointer
+                                    self.median_index = (self.median_index + 1)
+                                        % (self.params.median_nr.value() as usize);
+                                    // nih_trace!(
+                                    // "i: {}, Frequency: {}, Clarity: {}",
+                                    // i, self.pitch_val[0], self.pitch_val[1]
+                                    // );
+                                };
+                                // self.previous_pitch = self.pitches[self.median_index];
                             }
+                            // get the median pitch:
+                            // copy the pitches, we don't want to sort the ringbuffer
+                            let mut sorted: Vec<f32> = self.pitches.clone();
+                            // sort the copy
+                            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                            // get the middle one
+                            self.final_pitch = sorted[sorted.len() / 2];
+                            // self.final_pitch = self.pitches.iter().sum::<f32>()
+                            // / self.params.median_nr.value() as f32;
+                            // self.final_pitch = self.pitches[self.median_index];
+                            self.previous_pitch = self.final_pitch;
+                            // nih_trace!("pitch: {}", self.final_pitch);
                         }
+                    }
                     }
                     // positive saw at 1/4 freq, see https://github.com/magnetophon/VoiceOfFaust/blob/V1.1.4/lib/master.lib#L8
                     1 => {

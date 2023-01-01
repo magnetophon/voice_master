@@ -33,6 +33,8 @@ pitch-detection = { git = "https://github.com/magnetophon/pitch-detection.git" }
 pyin = { path = "/home/bart/.cargo/registry/src/github.com-1ecc6299db9ec823/pyin-1.0.2" }
 # pyin = { git = "https://github.com/Sytronik/pyin-rs.git" }
 ndarray = "0.15"
+irapt = "0.2"
+rubato = "0.12"
 
 simple-eq = { git = "https://github.com/m-hilgendorf/simple-eq.git" }
 

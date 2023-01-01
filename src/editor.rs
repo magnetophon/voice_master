@@ -2,17 +2,14 @@ use atomic_float::AtomicF32;
 use nih_plug::prelude::{util, Editor};
 use nih_plug_vizia::vizia::prelude::*;
 use nih_plug_vizia::widgets::*;
-use nih_plug_vizia::{assets, create_vizia_editor, ViziaState};
+use nih_plug_vizia::{assets, create_vizia_editor, ViziaState, ViziaTheming};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
 use crate::VoiceMasterParams;
 
-/// VIZIA uses points instead of pixels for text
-const POINT_SCALE: f32 = 0.75;
-
-const STYLE: &str = r#""#;
+// const STYLE: &str = r#""#;
 
 #[derive(Lens)]
 struct Data {
@@ -32,8 +29,10 @@ pub(crate) fn create(
     peak_meter: Arc<AtomicF32>,
     editor_state: Arc<ViziaState>,
 ) -> Option<Box<dyn Editor>> {
-    create_vizia_editor(editor_state, move |cx, _| {
-        cx.add_theme(STYLE);
+    // create_vizia_editor(editor_state, move |cx, _| {
+    create_vizia_editor(editor_state, ViziaTheming::Custom, move |cx, _| {
+        assets::register_noto_sans_light(cx);
+        assets::register_noto_sans_thin(cx);
 
         Data {
             params: params.clone(),
@@ -46,11 +45,11 @@ pub(crate) fn create(
         VStack::new(cx, |cx| {
             Label::new(cx, "Voice Master")
                 .font(assets::NOTO_SANS_THIN)
-                .font_size(40.0 * POINT_SCALE)
+                .font_size(30.0)
                 .height(Pixels(50.0))
                 .child_top(Stretch(1.0))
                 .child_bottom(Pixels(0.0))
-                // Make this more or less align with the parameters column
+            // Make this more or less align with the parameters column
                 .right(Pixels(67.0));
 
             GenericUi::new(cx, Data::params).child_top(Pixels(0.0));
@@ -61,10 +60,10 @@ pub(crate) fn create(
                 Some(Duration::from_millis(600)),
             )
             // This is how adding padding works in vizia
-            .top(Pixels(0.0));
+                .top(Pixels(0.0));
         })
-        .row_between(Pixels(0.0))
-        .child_left(Stretch(1.0))
-        .child_right(Stretch(1.0));
+            .row_between(Pixels(0.0))
+            .child_left(Stretch(1.0))
+            .child_right(Stretch(1.0));
     })
 }
