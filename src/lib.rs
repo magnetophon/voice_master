@@ -15,10 +15,11 @@ use std::sync::Arc;
 
 use rubato::{FftFixedInOut,Resampler};
 
-use pitch::detect;
+// use pitch::detect;
+use pitch_detection::detector::mcleod::McLeodDetector;
 
 mod editor;
-// mod pitch;
+mod pitch;
 
 // TODO:
 //
@@ -123,7 +124,7 @@ pub struct VoiceMaster {
     /// the final pitch that we are using
     final_pitch: f32,
     /// an array of pitch detectors, one for each size:
-    // detectors: [McLeodDetector<f32>; NR_OF_DETECTORS],
+    detectors: [McLeodDetector<f32>; NR_OF_DETECTORS],
     pyin_exec: [PYINExecutor<f32>; NR_OF_DETECTORS],
     irapt: Irapt,
     eq: Equalizer<f32>,
@@ -206,17 +207,16 @@ impl Default for VoiceMaster {
             previous_pitch: -1.0,
             final_pitch: 0.0,
             // they wil get the real size later
-            // detectors: [McLeodDetector::new(2, 1);NR_OF_DETECTORS],
-            // detectors: [
-            // McLeodDetector::new(2, 1),
-            // McLeodDetector::new(2, 1),
-            // McLeodDetector::new(2, 1),
-            // McLeodDetector::new(2, 1),
-            // McLeodDetector::new(2, 1),
-            // McLeodDetector::new(2, 1),
-            // McLeodDetector::new(2, 1),
-            // McLeodDetector::new(2, 1),
-            // ],
+            detectors: [
+                McLeodDetector::new(2, 1),
+                McLeodDetector::new(2, 1),
+                McLeodDetector::new(2, 1),
+                McLeodDetector::new(2, 1),
+                McLeodDetector::new(2, 1),
+                McLeodDetector::new(2, 1),
+                McLeodDetector::new(2, 1),
+                McLeodDetector::new(2, 1),
+            ],
             pyin_exec: [
                 PYINExecutor::new(750.0, 1350.0, 48000, 64, None, None, None),
                 PYINExecutor::new(375.0, 1350.0, 48000, 128, None, None, None),
@@ -467,8 +467,8 @@ impl Plugin for VoiceMaster {
         // After `PEAK_METER_DECAY_MS` milliseconds of pure silence, the peak meter's value should
         // have dropped by 12 dB
         self.peak_meter_decay_weight = 0.25f64
-            .powf((buffer_config.sample_rate as f64 * PEAK_METER_DECAY_MS / 1000.0).recip())
-            as f32;
+                                        .powf((buffer_config.sample_rate as f64 * PEAK_METER_DECAY_MS / 1000.0).recip())
+                                        as f32;
         self.sample_rate = buffer_config.sample_rate;
 
         // create an EQ for a given sample rate
@@ -476,23 +476,23 @@ impl Plugin for VoiceMaster {
 
         // pYin: None to use default values
         let sr = self.sample_rate as u32; // sampling rate of audio data in Hz
-                                          // let sr = (self.sample_rate / DOWNSAMPLE_RATIO as f32) as u32; // sampling rate of audio data in Hz
+        // let sr = (self.sample_rate / DOWNSAMPLE_RATIO as f32) as u32; // sampling rate of audio data in Hz
         let fmax = 1350.0f64; // maximum frequency in Hz
-                              // let frame_length = 2048usize; // frame length in samples
-                              // let pad_mode = PadMode::Constant(0.); // Zero-padding is applied on both sides of the signal. (only if cetner is true)
+        // let frame_length = 2048usize; // frame length in samples
+        // let pad_mode = PadMode::Constant(0.); // Zero-padding is applied on both sides of the signal. (only if cetner is true)
 
         for i in 0..NR_OF_DETECTORS {
             // let size = 2^i;
             let size = 2_usize.pow((i + MIN_DETECTOR_SIZE_POWER) as u32);
             let (win_length, hop_length, resolution) = (None, Some(size), None);
             let fmin = (sr / size as u32) as f64; // minimum frequency in Hz
-                                                  // let padding = size / 2;
-                                                  // self.detectors[i] = McLeodDetector::new(size, padding);
-                                                  // println!("i: {}, pow: {}, size: {}",i, i+MIN_DETECTOR_SIZE_POWER, size);
-                                                  // let min_period = ((sr as f64 / fmax).floor() as usize).max(1);
-                                                  // let max_period = ((sr as f64 / fmin).ceil() as usize).min(frame_length - win_length - 1);
-                                                  // if max_period - min_period < 2 {
-                                                  // panic!("min(ceil(sr / fmin), (frame_length - win_length - 1)) + 2 < floor(sr / fmax) should be satisfied!");
+            let padding = size / 2;
+            self.detectors[i] = McLeodDetector::new(size, padding);
+            // println!("i: {}, pow: {}, size: {}",i, i+MIN_DETECTOR_SIZE_POWER, size);
+            // let min_period = ((sr as f64 / fmax).floor() as usize).max(1);
+            // let max_period = ((sr as f64 / fmin).ceil() as usize).min(frame_length - win_length - 1);
+            // if max_period - min_period < 2 {
+            // panic!("min(ceil(sr / fmin), (frame_length - win_length - 1)) + 2 < floor(sr / fmax) should be satisfied!");
 
             // println!("fmin: {}, fmax: {}, sr: {}",fmin, fmax, sr);
             self.pyin_exec[i] =
@@ -622,17 +622,17 @@ impl Plugin for VoiceMaster {
 
 
                                 // call the pitchtracker
-                                // self.pitch_val = pitch::pitch(
-                                //     self.sample_rate,
-                                //     &slice,
-                                //     &mut self.detectors[(self.params.detector_size.value()
-                                //         as usize
-                                //         - MIN_DETECTOR_SIZE_POWER)],
-                                //     self.params.power_threshold.value(),
-                                //     // clarity_threshold: use 0.0, so all pitch values are let trough
-                                //     0.0,
-                                //     self.params.pick_threshold.value(),
-                                // );
+                                self.pitch_val = pitch::pitch(
+                                    self.sample_rate,
+                                    &slice,
+                                    &mut self.detectors[(self.params.detector_size.value()
+                                                         as usize
+                                                         - MIN_DETECTOR_SIZE_POWER)],
+                                    self.params.power_threshold.value(),
+                                    // clarity_threshold: use 0.0, so all pitch values are let trough
+                                    0.0,
+                                    self.params.pick_threshold.value(),
+                                );
                                 // let wav: CowArray<f64, Ix1> = ...;
                                 // let _fill_unvoiced = 0.0f32;
                                 // let framing: Framing<f32> = Framing::Valid;
@@ -652,14 +652,16 @@ impl Plugin for VoiceMaster {
                                 // .pyin(array, fill_unvoiced, framing);
 
                                 // call the pitchtracker
-                                let (hz, amplitude) = pitch::detect(&slice.as_slice().iter().map(|&x| x as f64).collect::<Vec<f64>>());
+                                // let (hz, amplitude) = pitch::detect(&slice.as_slice().iter().map(|&x| x as f64).collect::<Vec<f64>>());
 
-                                if
+
+                                // if clarity is high enough
+                                if self.pitch_val[1] > self.params.clarity_threshold.value()
                                 // and the pitch isn't too low or too high
-                                    (hz as f32) > self.params.min_pitch.value()
-                                    && (hz as f32)  < self.params.max_pitch.value()
+                                    && self.pitch_val[0] > self.params.min_pitch.value()
+                                    && self.pitch_val[0] < self.params.max_pitch.value()
                                 {
-                                    self.final_pitch = hz as f32;
+                                    self.final_pitch = self.pitch_val[0];
                                 };
 
                                 // let mut sample_index = 0;
