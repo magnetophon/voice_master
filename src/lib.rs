@@ -1,5 +1,5 @@
 use atomic_float::AtomicF32;
-use ndarray::prelude::*;
+
 use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
 // use pitch_detection::detector::mcleod::McLeodDetector;
@@ -497,7 +497,7 @@ impl Plugin for VoiceMaster {
                 PYINExecutor::new(fmin, fmax, sr, size, win_length, hop_length, resolution);
             // PYINExecutor::new(60.0, 6000.0, sr, size, win_length, hop_length, resolution);
 
-            let parameters = Parameters::default();
+            let _parameters = Parameters::default();
             self.irapt =
             // Irapt::new(parameters.clone()).expect("the default parameters should be valid");
                 Irapt::new(irapt::Parameters {
@@ -522,7 +522,7 @@ impl Plugin for VoiceMaster {
         &mut self,
         buffer: &mut Buffer,
         _aux: &mut AuxiliaryBuffers,
-        context: &mut impl ProcessContext<Self>,
+        _context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
         let mut channel_counter = 0;
         let size = 2_usize.pow((self.params.detector_size.value() as usize) as u32);
@@ -591,7 +591,7 @@ impl Plugin for VoiceMaster {
                         for i in 0..overlap {
                             // if index[i] == 0
                             // so IOW: when the buffer is full
-                            if (staggered_index(i, self.signal_index, size, overlap) == 0)
+                            if staggered_index(i, self.signal_index, size, overlap) == 0
                             // && (downsampling_index == 0)
                             {
                                 // [ &v[..3], &v[l - 3..]].concat()
@@ -632,9 +632,9 @@ impl Plugin for VoiceMaster {
                                 //     self.params.pick_threshold.value(),
                                 // );
                                 // let wav: CowArray<f64, Ix1> = ...;
-                                let fill_unvoiced = 0.0f32;
+                                let _fill_unvoiced = 0.0f32;
                                 // let framing: Framing<f32> = Framing::Valid;
-                                let framing: Framing<f32> = Framing::Center(Constant(0.0));
+                                let _framing: Framing<f32> = Framing::Center(Constant(0.0));
                                 // let center = true; // If true, the first sample in wav becomes the center of the first frame.
                                 // let pad_mode = PadMode::Constant(0.); // Zero-padding is applied on both sides of the signal. (only if cetner is true)
                                 // let array = CowArray::from(Array::from_vec(slice));
