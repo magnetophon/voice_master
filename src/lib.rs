@@ -15,11 +15,11 @@ use std::sync::Arc;
 
 use rubato::{FftFixedInOut,Resampler};
 
-// use pitch::detect;
+use pitch::detect;
 use pitch_detection::detector::mcleod::McLeodDetector;
 
 mod editor;
-mod pitch;
+mod mc_pitch;
 
 // TODO:
 //
@@ -622,7 +622,7 @@ impl Plugin for VoiceMaster {
 
 
                                 // call the pitchtracker
-                                self.pitch_val = pitch::pitch(
+                                self.pitch_val = mc_pitch::pitch(
                                     self.sample_rate,
                                     &slice,
                                     &mut self.detectors[(self.params.detector_size.value()
@@ -652,7 +652,7 @@ impl Plugin for VoiceMaster {
                                 // .pyin(array, fill_unvoiced, framing);
 
                                 // call the pitchtracker
-                                // let (hz, amplitude) = pitch::detect(&slice.as_slice().iter().map(|&x| x as f64).collect::<Vec<f64>>());
+                                let (hz, amplitude) = pitch::detect(&slice.as_slice().iter().map(|&x| x as f64).collect::<Vec<f64>>());
 
 
                                 // if clarity is high enough
@@ -660,8 +660,24 @@ impl Plugin for VoiceMaster {
                                 // and the pitch isn't too low or too high
                                     && self.pitch_val[0] > self.params.min_pitch.value()
                                     && self.pitch_val[0] < self.params.max_pitch.value()
+                                    && (hz as f32) > self.params.min_pitch.value()
+                                    && (hz as f32) < self.params.max_pitch.value()
                                 {
-                                    self.final_pitch = self.pitch_val[0];
+                                    if (1.0-(hz as f32/self.pitch_val[0])).abs() < self.params.change_compression.value()
+                                    // if (1.0-(hz as f32/self.pitch_val[0])).abs() < 0.79
+                                    {
+                                        self.final_pitch = self.pitch_val[0];
+                                    }
+                                    else
+                                    {
+                                        println!(
+                                            "mc_pitch: {}, hz: {}, diff: {}, change {}",
+                                            self.pitch_val[0],
+                                            hz,
+                                            (1.0-(hz as f32/self.pitch_val[0])).abs(),
+                                            self.params.change_compression.value()
+                                        );
+                                    };
                                 };
 
                                 // let mut sample_index = 0;
@@ -695,26 +711,26 @@ impl Plugin for VoiceMaster {
 
                                 // if
                                 // voiced_prob.to_vec()[0] > 0.0
-                                // && f0.to_vec()[0] > (self.sample_rate/size as f32)
-                                // {
-                                // println!(
-                                // "clarity: {},   pitch: {}, voiced_flag: {}",
-                                // voiced_prob.to_vec()[0],
-                                // f0.to_vec()[0],
-                                // voiced_flag.to_vec()[0]
-                                // );
-                                // };
+                                        // && f0.to_vec()[0] > (self.sample_rate/size as f32)
+                                        // {
+                                        // println!(
+                                        // "clarity: {},   pitch: {}, voiced_flag: {}",
+                                        // voiced_prob.to_vec()[0],
+                                        // f0.to_vec()[0],
+                                        // voiced_flag.to_vec()[0]
+                                        // );
+                                        // };
 
-                                // if voiced_prob.to_vec()[0] > 0.0
-                                // && f0.to_vec()[0] > (self.sample_rate/size as f32)
-                                // {
-                                // self.pitch_val = [f0.to_vec()[0], voiced_prob.to_vec()[0]];
-                                // }
-                                // println!("clarity: {},   pitch: {}", self.pitch_val[0],self.pitch_val[1]);
-                                //-> (Array1<A>, Array1<bool>, Array1<A>)
-                                // if clarity is high enough
-                                if self.pitch_val[1] > self.params.clarity_threshold.value()
-                                // and the pitch isn't too low or too high
+                                        // if voiced_prob.to_vec()[0] > 0.0
+                                        // && f0.to_vec()[0] > (self.sample_rate/size as f32)
+                                        // {
+                                        // self.pitch_val = [f0.to_vec()[0], voiced_prob.to_vec()[0]];
+                                        // }
+                                        // println!("clarity: {},   pitch: {}", self.pitch_val[0],self.pitch_val[1]);
+                                        //-> (Array1<A>, Array1<bool>, Array1<A>)
+                                        // if clarity is high enough
+                                        if self.pitch_val[1] > self.params.clarity_threshold.value()
+                                        // and the pitch isn't too low or too high
                                     && self.pitch_val[0] > self.params.min_pitch.value()
                                     && self.pitch_val[0] < self.params.max_pitch.value()
                                 {
