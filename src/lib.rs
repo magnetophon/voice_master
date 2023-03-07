@@ -545,10 +545,10 @@ impl Plugin for VoiceMaster {
         }
 
         // set the filter frequencies
-        self.eq
-            .set(0, Curve::Highpass, self.params.hp_freq.value(), 1.0, 0.0);
-        self.eq
-            .set(1, Curve::Lowpass, self.params.lp_freq.value(), 1.0, 0.0);
+        // self.eq
+        // .set(0, Curve::Highpass, self.params.hp_freq.value(), 1.0, 0.0);
+        // self.eq
+        // .set(1, Curve::Lowpass, self.params.lp_freq.value(), 1.0, 0.0);
 
         for channel_samples in buffer.iter_samples() {
             let mut amplitude = 0.0;
@@ -632,9 +632,9 @@ impl Plugin for VoiceMaster {
                                 //     self.params.pick_threshold.value(),
                                 // );
                                 // let wav: CowArray<f64, Ix1> = ...;
-                                let _fill_unvoiced = 0.0f32;
+                                // let _fill_unvoiced = 0.0f32;
                                 // let framing: Framing<f32> = Framing::Valid;
-                                let _framing: Framing<f32> = Framing::Center(Constant(0.0));
+                                // let _framing: Framing<f32> = Framing::Center(Constant(0.0));
                                 // let center = true; // If true, the first sample in wav becomes the center of the first frame.
                                 // let pad_mode = PadMode::Constant(0.); // Zero-padding is applied on both sides of the signal. (only if cetner is true)
                                 // let array = CowArray::from(Array::from_vec(slice));
@@ -706,35 +706,35 @@ impl Plugin for VoiceMaster {
                                     && self.pitch_val[0] > self.params.min_pitch.value()
                                     && self.pitch_val[0] < self.params.max_pitch.value()
                                 {
-                                    let ratio = self.previous_pitch / self.pitch_val[0];
-                                    let change = (ratio - 1.0).abs();
+                                    // let ratio = self.previous_pitch / self.pitch_val[0];
+                                    // let change = (ratio - 1.0).abs();
                                     // let prev_change =
                                     // ((self.pitches[self.median_index] / self.pitch_val[0]) - 1.0).abs();
                                     // let sign = if ratio > 1.0 { 1.0 } else { -1.0 };
-                                    let sign = ratio > 1.0;
-                                    let sp = ((change - self.params.ok_change.value())
-                                              * self.params.change_compression.value() as f32)
-                                        + self.params.ok_change.value();
-                                    let ratioo = if sign {
-                                        1.0 + sp
-                                        // (1.0 + sp).min(self.params.max_change.value())
-                                    } else {
-                                        1.0 - sp
-                                        // (1.0 - sp).max(0.0-self.params.max_change.value())
-                                    };
+                                    // let sign = ratio > 1.0;
+                                    // let sp = ((change - self.params.ok_change.value())
+                                    // * self.params.change_compression.value() as f32)
+                                    // + self.params.ok_change.value();
+                                    // let ratioo = if sign {
+                                    // 1.0 + sp
+                                    // (1.0 + sp).min(self.params.max_change.value())
+                                    // } else {
+                                    // 1.0 - sp
+                                    // (1.0 - sp).max(0.0-self.params.max_change.value())
+                                    // };
 
-                                    if change > self.params.ok_change.value() {
-                                        // update the pitches
+                                    // if change > self.params.ok_change.value() {
+                                    // update the pitches
 
-                                        self.pitches[self.median_index] =
-                                        // (ratioo) * self.pitch_val[0];
-                                            self.previous_pitch / ratioo;
-                                        // update the ringbuf pointer
-                                        self.median_index = (self.median_index + 1)
-                                            % (self.params.median_nr.value() as usize);
-                                        // self.previous_pitch = self.pitch_val[0];
-                                    if (ratio - ratioo).abs() > 0.05 {
-                                        // println!(
+                                    // self.pitches[self.median_index] =
+                                    // (ratioo) * self.pitch_val[0];
+                                    // self.previous_pitch / ratioo;
+                                    // update the ringbuf pointer
+                                    // self.median_index = (self.median_index + 1)
+                                    // % (self.params.median_nr.value() as usize);
+                                    // self.previous_pitch = self.pitch_val[0];
+                                    // if (ratio - ratioo).abs() > 0.05 {
+                                    // println!(
                                         // "ratio: {} change: {} change-ok: {} sign: {} sp: {} ratioo: {}",
                                         // ratio,
                                         // change,
@@ -745,33 +745,33 @@ impl Plugin for VoiceMaster {
                                         // ratioo,
                                         // );
                                     };
-                                } else {
-                                    // update the pitches
-                                    self.pitches[self.median_index] = self.pitch_val[0];
-                                    // update the ringbuf pointer
-                                    self.median_index = (self.median_index + 1)
-                                        % (self.params.median_nr.value() as usize);
-                                    // nih_trace!(
-                                    // "i: {}, Frequency: {}, Clarity: {}",
+                                // } else {
+                                // update the pitches
+                                // self.pitches[self.median_index] = self.pitch_val[0];
+                                // update the ringbuf pointer
+                                // self.median_index = (self.median_index + 1)
+                                // % (self.params.median_nr.value() as usize);
+                                // nih_trace!(
+                                // "i: {}, Frequency: {}, Clarity: {}",
                                     // i, self.pitch_val[0], self.pitch_val[1]
                                     // );
-                                };
+                                // };
                                 // self.previous_pitch = self.pitches[self.median_index];
                             }
                             // get the median pitch:
                             // copy the pitches, we don't want to sort the ringbuffer
-                            let mut sorted: Vec<f32> = self.pitches.clone();
+                            // let mut sorted: Vec<f32> = self.pitches.clone();
                             // sort the copy
-                            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                            // sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
                             // get the middle one
-                            self.final_pitch = sorted[sorted.len() / 2];
+                            // self.final_pitch = sorted[sorted.len() / 2];
                             // self.final_pitch = self.pitches.iter().sum::<f32>()
                             // / self.params.median_nr.value() as f32;
                             // self.final_pitch = self.pitches[self.median_index];
-                            self.previous_pitch = self.final_pitch;
+                            // self.previous_pitch = self.final_pitch;
                             // nih_trace!("pitch: {}", self.final_pitch);
                         }
-                        }
+                        // }
                     }
                     // positive saw at 1/4 freq, see https://github.com/magnetophon/VoiceOfFaust/blob/V1.1.4/lib/master.lib#L8
                     1 => {
