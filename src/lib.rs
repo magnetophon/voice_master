@@ -613,12 +613,10 @@ impl Plugin for VoiceMaster {
                                 };
 
                                 // resample:
-                                // let resampled = self.resampler..resampler.process_into_buffer(&vec![slice;1], None).unwrap()[0].clone();
-                                // let resampled = self.resampler.process(&slice,None).unwrap();
-                                let resampled = self.resampler.process(&vec![slice;1],None).unwrap()[0].clone();
-                                let mut sample_buffer = VecDeque::from(resampled);
-                                // and uncomment this one:
-                                // let mut sample_buffer = VecDeque::from(slice);
+                                // let resampled = self.resampler.process(&vec![slice;1],None).unwrap()[0].clone();
+                                // let mut sample_buffer = VecDeque::from(resampled);
+                                // don't resample:
+                                let mut sample_buffer = VecDeque::from(slice);
 
 
                                 // call the pitchtracker
