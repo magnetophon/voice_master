@@ -663,7 +663,16 @@ impl Plugin for VoiceMaster {
                                     && (hz as f32) > self.params.min_pitch.value()
                                     && (hz as f32) < self.params.max_pitch.value()
                                 {
-                                    if (1.0-(hz as f32/self.pitch_val[0])).abs() < self.params.change_compression.value()
+                                    let mut diff = 0.0;
+                                    if (hz as f32) < self.pitch_val[0]
+                                    {
+                                        diff = (1.0-(hz as f32/self.pitch_val[0])).abs();
+                                    }
+                                    else
+                                    {
+                                        diff = (1.0-(self.pitch_val[0]/hz as f32)).abs();
+                                    }
+                                    if diff < self.params.change_compression.value()
                                     // if (1.0-(hz as f32/self.pitch_val[0])).abs() < 0.79
                                     {
                                         self.final_pitch = self.pitch_val[0];
@@ -674,7 +683,7 @@ impl Plugin for VoiceMaster {
                                             "mc_pitch: {}, hz: {}, diff: {}, change {}",
                                             self.pitch_val[0],
                                             hz,
-                                            (1.0-(hz as f32/self.pitch_val[0])).abs(),
+                                            diff,
                                             self.params.change_compression.value()
                                         );
                                     };
