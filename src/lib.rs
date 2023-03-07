@@ -431,18 +431,18 @@ impl Plugin for VoiceMaster {
 
     const VERSION: &'static str = "0.0.1";
 
-    const DEFAULT_INPUT_CHANNELS: u32 = 1;
-    const DEFAULT_OUTPUT_CHANNELS: u32 = 3;
-
-    const DEFAULT_AUX_INPUTS: Option<AuxiliaryIOConfig> = None;
-    const DEFAULT_AUX_OUTPUTS: Option<AuxiliaryIOConfig> = None;
-
-    const MIDI_INPUT: MidiConfig = MidiConfig::None;
-    const MIDI_OUTPUT: MidiConfig = MidiConfig::None;
+    const AUDIO_IO_LAYOUTS: &'static [AudioIOLayout] = &[
+        AudioIOLayout {
+            main_input_channels: NonZeroU32::new(1),
+            main_output_channels: NonZeroU32::new(3),
+            ..AudioIOLayout::const_default()
+        },
+    ];
 
     const SAMPLE_ACCURATE_AUTOMATION: bool = true;
 
     type BackgroundTask = ();
+    type SysExMessage = ();
 
     fn params(&self) -> Arc<dyn Params> {
         self.params.clone()
@@ -456,14 +456,9 @@ impl Plugin for VoiceMaster {
         )
     }
 
-    fn accepts_bus_config(&self, config: &BusConfig) -> bool {
-        config.num_input_channels == Self::DEFAULT_INPUT_CHANNELS
-            && config.num_output_channels == Self::DEFAULT_OUTPUT_CHANNELS
-    }
-
     fn initialize(
         &mut self,
-        _bus_config: &BusConfig,
+        _audio_io_layout: &AudioIOLayout,
         buffer_config: &BufferConfig,
         _context: &mut impl InitContext<Self>,
     ) -> bool {
@@ -778,7 +773,7 @@ impl Plugin for VoiceMaster {
                             self.previous_pitch = self.final_pitch;
                             // nih_trace!("pitch: {}", self.final_pitch);
                         }
-                    }
+                        }
                     }
                     // positive saw at 1/4 freq, see https://github.com/magnetophon/VoiceOfFaust/blob/V1.1.4/lib/master.lib#L8
                     1 => {
@@ -792,7 +787,8 @@ impl Plugin for VoiceMaster {
                     _ => panic!("Why are we here?"),
                 }
                 // next channel
-                channel_counter = (channel_counter + 1) % Self::DEFAULT_OUTPUT_CHANNELS;
+                const NR_OUTPUT_CHANNELS : i32 = 3;
+                channel_counter = (channel_counter + 1) % NR_OUTPUT_CHANNELS;
             }
 
             // To save resources, a plugin can (and probably should!) only perform expensive
@@ -835,7 +831,8 @@ impl ClapPlugin for VoiceMaster {
 
 impl Vst3Plugin for VoiceMaster {
     const VST3_CLASS_ID: [u8; 16] = *b"VoiceMaster_____";
-    const VST3_CATEGORIES: &'static str = "Fx|Dynamics";
+    const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] =
+        &[Vst3SubCategory::Analyzer, Vst3SubCategory::Tools];
 }
 
 // nih_export_clap!(VoiceMaster);
