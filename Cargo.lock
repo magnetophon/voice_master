@@ -1809,7 +1809,7 @@ dependencies = [
 [[package]]
 name = "nih_plug"
 version = "0.0.0"
-source = "git+https://github.com/robbert-vdh/nih-plug.git#ae3356dca8cc975a0dd3d390a911f2bf56cc5ff5"
+source = "git+https://github.com/robbert-vdh/nih-plug.git#17a95e703f47bf24d9deeecb3d382774c4451d6c"
 dependencies = [
  "anyhow",
  "anymap",
@@ -1852,7 +1852,7 @@ source = "git+https://github.com/robbert-vdh/nih_plug_assets.git#a04e327923e120b
 [[package]]
 name = "nih_plug_derive"
 version = "0.1.0"
-source = "git+https://github.com/robbert-vdh/nih-plug.git#ae3356dca8cc975a0dd3d390a911f2bf56cc5ff5"
+source = "git+https://github.com/robbert-vdh/nih-plug.git#17a95e703f47bf24d9deeecb3d382774c4451d6c"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1862,7 +1862,7 @@ dependencies = [
 [[package]]
 name = "nih_plug_vizia"
 version = "0.0.0"
-source = "git+https://github.com/robbert-vdh/nih-plug.git#ae3356dca8cc975a0dd3d390a911f2bf56cc5ff5"
+source = "git+https://github.com/robbert-vdh/nih-plug.git#17a95e703f47bf24d9deeecb3d382774c4451d6c"
 dependencies = [
  "baseview",
  "crossbeam",
@@ -1875,7 +1875,7 @@ dependencies = [
 [[package]]
 name = "nih_plug_xtask"
 version = "0.1.0"
-source = "git+https://github.com/robbert-vdh/nih-plug.git#ae3356dca8cc975a0dd3d390a911f2bf56cc5ff5"
+source = "git+https://github.com/robbert-vdh/nih-plug.git#17a95e703f47bf24d9deeecb3d382774c4451d6c"
 dependencies = [
  "anyhow",
  "goblin",
@@ -2194,9 +2194,9 @@ checksum = "b7e5500299e16ebb147ae15a00a942af264cf3688f47923b8fc2cd5858f23ad3"
 
 [[package]]
 name = "orbclient"
-version = "0.3.42"
+version = "0.3.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba683f1641c11041c59d5d93689187abcab3c1349dc6d9d70c550c9f9360802f"
+checksum = "974465c5e83cf9df05c1e4137b271d29035c902e39e5ad4c1939837e22160af8"
 dependencies = [
  "cfg-if 1.0.0",
  "redox_syscall 0.2.16",
@@ -2361,6 +2361,11 @@ checksum = "c00cf8b9eafe68dde5e9eaa2cef8ee84a9336a47d566ec55ca16589633b65af7"
 dependencies = [
  "siphasher",
 ]
+
+[[package]]
+name = "pitch"
+version = "0.2.0"
+source = "git+https://gitlab.com/plopgrizzly/audio/pitch.git#83a256831686ead98cbf29b7c663a76446433c6b"
 
 [[package]]
 name = "pitch-detection"
@@ -3428,6 +3433,7 @@ dependencies = [
  "ndarray",
  "nih_plug",
  "nih_plug_vizia",
+ "pitch",
  "pitch-detection",
  "pyin",
  "rubato",

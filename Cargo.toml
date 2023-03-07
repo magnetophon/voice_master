@@ -37,6 +37,7 @@ irapt = "0.2"
 rubato = "0.12"
 
 simple-eq = { git = "https://github.com/m-hilgendorf/simple-eq.git" }
+pitch = { git = "https://gitlab.com/plopgrizzly/audio/pitch.git" }
 
 
 # [patch]

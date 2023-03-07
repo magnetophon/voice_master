@@ -15,8 +15,10 @@ use std::sync::Arc;
 
 use rubato::{FftFixedInOut,Resampler};
 
+use pitch::detect;
+
 mod editor;
-mod pitch;
+// mod pitch;
 
 // TODO:
 //
@@ -616,7 +618,7 @@ impl Plugin for VoiceMaster {
                                 // let resampled = self.resampler.process(&vec![slice;1],None).unwrap()[0].clone();
                                 // let mut sample_buffer = VecDeque::from(resampled);
                                 // don't resample:
-                                let mut sample_buffer = VecDeque::from(slice);
+                                // let mut sample_buffer = VecDeque::from(slice);
 
 
                                 // call the pitchtracker
@@ -650,36 +652,44 @@ impl Plugin for VoiceMaster {
                                 // .pyin(array, fill_unvoiced, framing);
 
                                 // call the pitchtracker
+                                let (hz, amplitude) = pitch::detect(&slice.as_slice().iter().map(|&x| x as f64).collect::<Vec<f64>>());
 
-                                let mut sample_index = 0;
-                                while let (initial_sample_buffer_len, Some(output)) =
-                                    (size, self.irapt.process(&mut sample_buffer))
+                                if
+                                // and the pitch isn't too low or too high
+                                    (hz as f32) > self.params.min_pitch.value()
+                                    && (hz as f32)  < self.params.max_pitch.value()
                                 {
-                                    let estimated_pitch =
-                                        output.pitch_estimates().final_estimate();
-                                    if estimated_pitch.energy as f32
-                                        > self.params.clarity_threshold.value()
-                                    {
-                                        let estimated_pitch_index = (sample_index as isize
-                                                                     + estimated_pitch.offset)
-                                            as usize;
-                                        let estimated_pitch_time =
-                                            estimated_pitch_index as f32 / self.sample_rate;
-                                        println!(
-                                            "estimated pitch at {:0.3}: {}Hz with energy {}",
-                                            estimated_pitch_time,
-                                            estimated_pitch.frequency,
-                                            estimated_pitch.energy
-                                        );
-                                        sample_index +=
-                                            initial_sample_buffer_len - sample_buffer.len();
-                                        // self.pitch_val = [estimated_pitch.to_vec()[0], estimated_pitch.energy.to_vec()];
-                                        self.pitch_val = [
-                                            estimated_pitch.frequency as f32,
-                                            estimated_pitch.energy as f32,
-                                        ];
-                                    }
-                                }
+                                    self.final_pitch = hz as f32;
+                                };
+
+                                // let mut sample_index = 0;
+                                // while let (initial_sample_buffer_len, Some(output)) =
+                                // (size, self.irapt.process(&mut sample_buffer))
+                                // {
+                                // let estimated_pitch =
+                                // output.pitch_estimates().final_estimate();
+                                // if estimated_pitch.energy as f32
+                                // > self.params.clarity_threshold.value()
+                                // {
+                                // let estimated_pitch_index = (sample_index as isize
+                                // + estimated_pitch.offset)
+                                // as usize;
+                                // let estimated_pitch_time =
+                                // estimated_pitch_index as f32 / self.sample_rate;
+                                // println!(
+                                // "estimated pitch at {:0.3}: {}Hz with energy {}",
+                                // estimated_pitch_time,
+                                // estimated_pitch.frequency,
+                                // estimated_pitch.energy
+                                // );
+                                // sample_index +=
+                                // initial_sample_buffer_len - sample_buffer.len();
+                                // self.pitch_val = [
+                                // estimated_pitch.frequency as f32,
+                                // estimated_pitch.energy as f32,
+                                // ];
+                                // }
+                                // }
 
                                 // if
                                 // voiced_prob.to_vec()[0] > 0.0
