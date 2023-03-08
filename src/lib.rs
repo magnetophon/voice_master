@@ -454,7 +454,7 @@ impl Plugin for VoiceMaster {
         &mut self,
         _audio_io_layout: &AudioIOLayout,
         buffer_config: &BufferConfig,
-        context: &mut impl InitContext<Self>,
+        _context: &mut impl InitContext<Self>,
     ) -> bool {
         // After `PEAK_METER_DECAY_MS` milliseconds of pure silence, the peak meter's value should
         // have dropped by 12 dB
@@ -467,17 +467,17 @@ impl Plugin for VoiceMaster {
         self.eq = Equalizer::new(self.sample_rate as f32);
 
         // pYin: None to use default values
-        let sr = self.sample_rate as u32; // sampling rate of audio data in Hz
-                                          // let sr = (self.sample_rate / DOWNSAMPLE_RATIO as f32) as u32; // sampling rate of audio data in Hz
-        let fmax = 1350.0f64; // maximum frequency in Hz
-                              // let frame_length = 2048usize; // frame length in samples
-                              // let pad_mode = PadMode::Constant(0.); // Zero-padding is applied on both sides of the signal. (only if cetner is true)
+        // let sr = self.sample_rate as u32; // sampling rate of audio data in Hz
+        // let sr = (self.sample_rate / DOWNSAMPLE_RATIO as f32) as u32; // sampling rate of audio data in Hz
+        // let fmax = 1350.0f64; // maximum frequency in Hz
+        // let frame_length = 2048usize; // frame length in samples
+        // let pad_mode = PadMode::Constant(0.); // Zero-padding is applied on both sides of the signal. (only if cetner is true)
 
         for i in 0..NR_OF_DETECTORS {
             // let size = 2^i;
             let size = 2_usize.pow((i + MIN_DETECTOR_SIZE_POWER) as u32);
             // let (win_length, hop_length, resolution) = (None, Some(size), None);
-            let fmin = (sr / size as u32) as f64; // minimum frequency in Hz
+            // let fmin = (sr / size as u32) as f64; // minimum frequency in Hz
             let padding = size / 2;
             self.detectors[i] = McLeodDetector::new(size, padding);
             // println!("i: {}, pow: {}, size: {}",i, i+MIN_DETECTOR_SIZE_POWER, size);
@@ -501,7 +501,7 @@ impl Plugin for VoiceMaster {
                 }).expect("the default parameters should be valid");
             self.resampler =
                 FftFixedInOut::<f32>::new(self.sample_rate as usize, DOWNSAMPLED_RATE, 2048, 1)
-                    .unwrap();
+                .unwrap();
         }
 
         true
@@ -585,7 +585,7 @@ impl Plugin for VoiceMaster {
                                 // [ &v[..3], &v[l - 3..]].concat()
                                 // check if the end wraps around:
                                 let index_plus_size = (self.signal_index + size) % MAX_SIZE;
-                                let mut slice = vec![0.0; MAX_SIZE];
+                                let mut slice  : Vec<f32> = Vec::with_capacity(MAX_SIZE);
                                 // if no wrap around:
                                 if (self.signal_index) < index_plus_size {
                                     slice =
@@ -601,42 +601,36 @@ impl Plugin for VoiceMaster {
                                 };
 
                                 // resample:
-                                let mut resampled = vec![0.0 as f32; MAX_SIZE];
-                                // rubato::Resampler::
-                                // self.resampler.process_into_buffer(
-                                // slice,
-                                // &mut resampled,
-                                // None,
-                                // )
-
-                                // .unwrap()[0].clone()
-                                // self.resampler.process(&vec![slice;1],None).unwrap()[0].clone();
-                                // let mut sample_buffer = VecDeque::from(resampled);
-                                // don't resample:
-                                // let mut sample_buffer = VecDeque::from(slice);
+                                let mut resampled : Vec<f32> = Vec::with_capacity(MAX_SIZE);
+                                self.resampler.process_into_buffer(
+                                    &[slice; 1],
+                                    &mut [resampled],
+                                    None,
+                                );
 
                                 // call the pitchtracker
+                                let detector = &mut self.detectors[self.params.detector_size.value() as usize - MIN_DETECTOR_SIZE_POWER];
                                 self.pitch_val = mc_pitch::pitch(
                                     self.sample_rate,
                                     // &slice,
-                                    &slice,
-                                    &mut self.detectors[self.params.detector_size.value() as usize
-                                        - MIN_DETECTOR_SIZE_POWER],
+                                    &resampled.clone(),
+                                    detector,
                                     self.params.power_threshold.value(),
                                     // clarity_threshold: use 0.0, so all pitch values are let trough
                                     0.0,
                                     self.params.pick_threshold.value(),
                                 );
-                                // call the pitchtracker
-                                let (hz, amplitude) = detect(
+
+                                // call the other pitchtracker
+                                let (hz, _amplitude) = detect(
                                     // &slice
-                                    &slice
-                                        .as_slice()
+                                    &resampled.clone()
+                                              .as_slice()
                                         .iter()
                                         .map(|&x| x as f64)
                                         .collect::<Vec<f64>>(),
                                 );
-                                // let wav: CowArray<f64, Ix1> = ...;
+
                                 // let _fill_unvoiced = 0.0f32;
                                 // let framing: Framing<f32> = Framing::Valid;
                                 // let _framing: Framing<f32> = Framing::Center(Constant(0.0));
@@ -662,12 +656,12 @@ impl Plugin for VoiceMaster {
                                     && (hz as f32) > self.params.min_pitch.value()
                                     && (hz as f32) < self.params.max_pitch.value()
                                 {
-                                    let mut diff = 0.0;
-                                    if (hz as f32) < self.pitch_val[0] {
-                                        diff = (1.0 - (hz as f32 / self.pitch_val[0])).abs();
-                                    } else {
-                                        diff = (1.0 - (self.pitch_val[0] / hz as f32)).abs();
-                                    }
+                                    let diff : f32 =
+                                        if (hz as f32) < self.pitch_val[0] {
+                                            (1.0 - (hz as f32 / self.pitch_val[0])).abs()
+                                        } else {
+                                            (1.0 - (self.pitch_val[0] / hz as f32)).abs()
+                                        };
                                     if diff < self.params.change_compression.value()
                                     // if (1.0-(hz as f32/self.pitch_val[0])).abs() < 0.79
                                     {
