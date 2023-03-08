@@ -3,8 +3,8 @@ use atomic_float::AtomicF32;
 use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
 // use pitch_detection::detector::mcleod::McLeodDetector;
-use pyin::PadMode::Constant;
-use pyin::{Framing, PYINExecutor};
+// use pyin::PadMode::Constant;
+// use pyin::{Framing, PYINExecutor};
 
 use irapt::{Irapt, Parameters};
 use std::collections::VecDeque;
@@ -125,7 +125,7 @@ pub struct VoiceMaster {
     final_pitch: f32,
     /// an array of pitch detectors, one for each size:
     detectors: [McLeodDetector<f32>; NR_OF_DETECTORS],
-    pyin_exec: [PYINExecutor<f32>; NR_OF_DETECTORS],
+    // pyin_exec: [PYINExecutor<f32>; NR_OF_DETECTORS],
     irapt: Irapt,
     eq: Equalizer<f32>,
     resampler: FftFixedInOut<f32>,
@@ -217,16 +217,16 @@ impl Default for VoiceMaster {
                 McLeodDetector::new(2, 1),
                 McLeodDetector::new(2, 1),
             ],
-            pyin_exec: [
-                PYINExecutor::new(750.0, 1350.0, 48000, 64, None, None, None),
-                PYINExecutor::new(375.0, 1350.0, 48000, 128, None, None, None),
-                PYINExecutor::new(187.5, 1350.0, 48000, 256, None, None, None),
-                PYINExecutor::new(93.75, 1350.0, 48000, 512, None, None, None),
-                PYINExecutor::new(46.875, 1350.0, 48000, 1024, None, None, None),
-                PYINExecutor::new(23.4375, 1350.0, 48000, 2048, None, None, None),
-                PYINExecutor::new(11.71875, 1350.0, 48000, 4096, None, None, None),
-                PYINExecutor::new(5.859375, 1350.0, 48000, 8192, None, None, None),
-            ],
+            // pyin_exec: [
+            // PYINExecutor::new(750.0, 1350.0, 48000, 64, None, None, None),
+            // PYINExecutor::new(375.0, 1350.0, 48000, 128, None, None, None),
+            // PYINExecutor::new(187.5, 1350.0, 48000, 256, None, None, None),
+            // PYINExecutor::new(93.75, 1350.0, 48000, 512, None, None, None),
+            // PYINExecutor::new(46.875, 1350.0, 48000, 1024, None, None, None),
+            // PYINExecutor::new(23.4375, 1350.0, 48000, 2048, None, None, None),
+            // PYINExecutor::new(11.71875, 1350.0, 48000, 4096, None, None, None),
+            // PYINExecutor::new(5.859375, 1350.0, 48000, 8192, None, None, None),
+            // ],
             eq: Equalizer::new(48000.0),
 
             // let parameters = Parameters::default();
@@ -476,7 +476,7 @@ impl Plugin for VoiceMaster {
         for i in 0..NR_OF_DETECTORS {
             // let size = 2^i;
             let size = 2_usize.pow((i + MIN_DETECTOR_SIZE_POWER) as u32);
-            let (win_length, hop_length, resolution) = (None, Some(size), None);
+            // let (win_length, hop_length, resolution) = (None, Some(size), None);
             let fmin = (sr / size as u32) as f64; // minimum frequency in Hz
             let padding = size / 2;
             self.detectors[i] = McLeodDetector::new(size, padding);
@@ -487,9 +487,8 @@ impl Plugin for VoiceMaster {
             // panic!("min(ceil(sr / fmin), (frame_length - win_length - 1)) + 2 < floor(sr / fmax) should be satisfied!");
 
             // println!("fmin: {}, fmax: {}, sr: {}",fmin, fmax, sr);
-            self.pyin_exec[i] =
-                PYINExecutor::new(fmin, fmax, sr, size, win_length, hop_length, resolution);
-            // PYINExecutor::new(60.0, 6000.0, sr, size, win_length, hop_length, resolution);
+            // self.pyin_exec[i] =
+            // PYINExecutor::new(fmin, fmax, sr, size, win_length, hop_length, resolution);
 
             let _parameters = Parameters::default();
             self.irapt =
