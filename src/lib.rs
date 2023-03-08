@@ -84,7 +84,7 @@ const MAX_DETECTOR_SIZE_POWER: usize = 13;
 const NR_OF_DETECTORS: usize = MAX_DETECTOR_SIZE_POWER - MIN_DETECTOR_SIZE_POWER + 1;
 const MAX_SIZE: usize = 2_usize.pow(MAX_DETECTOR_SIZE_POWER as u32);
 /// the maximum nr of times the detector is updated each 2048 samples
-const MAX_OVERLAP: usize = 128;
+const MAX_OVERLAP: usize = 512;
 /// The median is taken from at max this nr of pitches
 const MAX_MEDIAN_NR: usize = 32;
 const MEDIAN_NR_DEFAULT: i32 = 1;
@@ -298,7 +298,7 @@ impl Default for VoiceMasterParams {
 
             overlap: IntParam::new(
                 "Overlap",
-                1,
+                128,
                 IntRange::Linear {
                     min: 1,
                     max: MAX_OVERLAP as i32,
