@@ -7,9 +7,9 @@ use nih_plug_vizia::ViziaState;
 // use pyin::{Framing, PYINExecutor};
 
 use irapt::{Irapt, Parameters};
-use std::collections::VecDeque;
+// use std::collections::VecDeque;
 
-use simple_eq::design::Curve;
+// use simple_eq::design::Curve;
 use simple_eq::*;
 use std::sync::Arc;
 
@@ -601,7 +601,16 @@ impl Plugin for VoiceMaster {
                                 };
 
                                 // resample:
-                                // let resampled = self.resampler.process(&vec![slice;1],None).unwrap()[0].clone();
+                                let mut resampled = vec![0.0 as f32; MAX_SIZE];
+                                // rubato::Resampler::
+                                // self.resampler.process_into_buffer(
+                                // slice,
+                                // &mut resampled,
+                                // None,
+                                // )
+
+                                // .unwrap()[0].clone()
+                                // self.resampler.process(&vec![slice;1],None).unwrap()[0].clone();
                                 // let mut sample_buffer = VecDeque::from(resampled);
                                 // don't resample:
                                 // let mut sample_buffer = VecDeque::from(slice);
@@ -609,14 +618,23 @@ impl Plugin for VoiceMaster {
                                 // call the pitchtracker
                                 self.pitch_val = mc_pitch::pitch(
                                     self.sample_rate,
+                                    // &slice,
                                     &slice,
-                                    &mut self.detectors[(self.params.detector_size.value()
-                                        as usize
-                                        - MIN_DETECTOR_SIZE_POWER)],
+                                    &mut self.detectors[self.params.detector_size.value() as usize
+                                        - MIN_DETECTOR_SIZE_POWER],
                                     self.params.power_threshold.value(),
                                     // clarity_threshold: use 0.0, so all pitch values are let trough
                                     0.0,
                                     self.params.pick_threshold.value(),
+                                );
+                                // call the pitchtracker
+                                let (hz, amplitude) = detect(
+                                    // &slice
+                                    &slice
+                                        .as_slice()
+                                        .iter()
+                                        .map(|&x| x as f64)
+                                        .collect::<Vec<f64>>(),
                                 );
                                 // let wav: CowArray<f64, Ix1> = ...;
                                 // let _fill_unvoiced = 0.0f32;
@@ -635,15 +653,6 @@ impl Plugin for VoiceMaster {
                                 // self.pyin_exec[(self.params.detector_size.value() as usize
                                 // - MIN_DETECTOR_SIZE_POWER)]
                                 // .pyin(array, fill_unvoiced, framing);
-
-                                // call the pitchtracker
-                                let (hz, amplitude) = pitch::detect(
-                                    &slice
-                                        .as_slice()
-                                        .iter()
-                                        .map(|&x| x as f64)
-                                        .collect::<Vec<f64>>(),
-                                );
 
                                 // if clarity is high enough
                                 if self.pitch_val[1] > self.params.clarity_threshold.value()
@@ -856,4 +865,4 @@ impl Vst3Plugin for VoiceMaster {
 }
 
 // nih_export_clap!(VoiceMaster);
-nih_export_vst3!(VoiceMaster);
+// nih_export_vst3!(VoiceMaster);
