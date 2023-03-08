@@ -454,7 +454,7 @@ impl Plugin for VoiceMaster {
         &mut self,
         _audio_io_layout: &AudioIOLayout,
         buffer_config: &BufferConfig,
-        _context: &mut impl InitContext<Self>,
+        context: &mut impl InitContext<Self>,
     ) -> bool {
         // After `PEAK_METER_DECAY_MS` milliseconds of pure silence, the peak meter's value should
         // have dropped by 12 dB
@@ -512,18 +512,19 @@ impl Plugin for VoiceMaster {
         &mut self,
         buffer: &mut Buffer,
         _aux: &mut AuxiliaryBuffers,
-        _context: &mut impl ProcessContext<Self>,
+        context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
         let mut channel_counter = 0;
         let size = 2_usize.pow((self.params.detector_size.value() as usize) as u32);
         let overlap = self.params.overlap.value() as usize * size / 2048;
 
         // set the latency, cannot do that from a callback
-        // if self.params.latency.value() {
-        // context.set_latency_samples(size as u32);
-        // } else {
-        // context.set_latency_samples(0);
-        // }
+        if self.params.latency.value() {
+            context.set_latency_samples(size as u32);
+            println!("latency: {}",size );
+        } else {
+            context.set_latency_samples(0);
+        }
 
         // if there is a new median_nr value
         if self.pitches.len() != (self.params.median_nr.value() as usize) {
@@ -857,4 +858,4 @@ impl Vst3Plugin for VoiceMaster {
 }
 
 // nih_export_clap!(VoiceMaster);
-// nih_export_vst3!(VoiceMaster);
+nih_export_vst3!(VoiceMaster);
