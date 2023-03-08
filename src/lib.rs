@@ -580,10 +580,10 @@ impl Plugin for VoiceMaster {
                         // self.signal[self.signal_index] = sample_filtered as f32;
                         // }
                         // if the user chooses to sync up the audio with the pitch
-                        // if self.params.latency.value() {
-                        //     // delay our sample
-                        //     *sample = self.delay_line[(signal_index - size) % MAX_SIZE];
-                        // }
+                        if self.params.latency.value() {
+                            //     // delay our sample
+                            *sample = self.delay_line[(self.signal_index - size) % MAX_SIZE];
+                        }
 
                         // update the index
                         self.signal_index = (self.signal_index + 1) % MAX_SIZE;
