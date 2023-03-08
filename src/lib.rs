@@ -521,7 +521,6 @@ impl Plugin for VoiceMaster {
         // set the latency, cannot do that from a callback
         if self.params.latency.value() {
             context.set_latency_samples(size as u32);
-            println!("latency: {}",size );
         } else {
             context.set_latency_samples(0);
         }
