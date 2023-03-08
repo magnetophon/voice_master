@@ -51,7 +51,7 @@ pub(crate) fn create(
                 .height(Pixels(50.0))
                 .child_top(Stretch(1.0))
                 .child_bottom(Pixels(0.0))
-            // Make this more or less align with the parameters column
+                // Make this more or less align with the parameters column
                 .right(Pixels(67.0));
 
             GenericUi::new(cx, Data::params).child_top(Pixels(0.0));
@@ -62,10 +62,10 @@ pub(crate) fn create(
                 Some(Duration::from_millis(600)),
             )
             // This is how adding padding works in vizia
-                .top(Pixels(0.0));
+            .top(Pixels(0.0));
         })
-            .row_between(Pixels(0.0))
-            .child_left(Stretch(1.0))
-            .child_right(Stretch(1.0));
+        .row_between(Pixels(0.0))
+        .child_left(Stretch(1.0))
+        .child_right(Stretch(1.0));
     })
 }

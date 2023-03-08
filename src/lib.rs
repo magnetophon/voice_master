@@ -13,7 +13,7 @@ use simple_eq::design::Curve;
 use simple_eq::*;
 use std::sync::Arc;
 
-use rubato::{FftFixedInOut,Resampler};
+use rubato::{FftFixedInOut, Resampler};
 
 use pitch::detect;
 use pitch_detection::detector::mcleod::McLeodDetector;
@@ -241,13 +241,7 @@ impl Default for VoiceMaster {
             // })
             irapt: Irapt::new(Parameters::default().clone())
                 .expect("the default parameters should be valid"),
-            resampler: FftFixedInOut::<f32>::new(
-                48000,
-                DOWNSAMPLED_RATE,
-                2048,
-                1,
-
-            ).unwrap(),
+            resampler: FftFixedInOut::<f32>::new(48000, DOWNSAMPLED_RATE, 2048, 1).unwrap(),
         }
     }
 }
@@ -279,10 +273,10 @@ impl Default for VoiceMasterParams {
                     factor: FloatRange::gain_skew_factor(-30.0, 30.0),
                 },
             )
-                .with_smoother(SmoothingStyle::Logarithmic(50.0))
-                .with_unit(" dB")
-                .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
-                .with_string_to_value(formatters::s2v_f32_gain_to_db()),
+            .with_smoother(SmoothingStyle::Logarithmic(50.0))
+            .with_unit(" dB")
+            .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
+            .with_string_to_value(formatters::s2v_f32_gain_to_db()),
 
             detector_size: IntParam::new(
                 "Detector Size",
@@ -292,9 +286,9 @@ impl Default for VoiceMasterParams {
                     max: MAX_DETECTOR_SIZE_POWER as i32,
                 },
             )
-                .with_unit(" samples")
-                .with_value_to_string(formatters::v2s_i32_power_of_two())
-                .with_string_to_value(formatters::s2v_i32_power_of_two()),
+            .with_unit(" samples")
+            .with_value_to_string(formatters::v2s_i32_power_of_two())
+            .with_string_to_value(formatters::s2v_i32_power_of_two()),
 
             overlap: IntParam::new(
                 "Overlap",
@@ -304,7 +298,7 @@ impl Default for VoiceMasterParams {
                     max: MAX_OVERLAP as i32,
                 },
             )
-                .with_unit(" times/2048"),
+            .with_unit(" times/2048"),
 
             power_threshold: FloatParam::new(
                 "Power Threshold",
@@ -349,7 +343,7 @@ impl Default for VoiceMasterParams {
                     factor: FloatRange::skew_factor(-1.0),
                 },
             )
-                .with_unit(" Hz"),
+            .with_unit(" Hz"),
             max_pitch: FloatParam::new(
                 "Maximum Pitch",
                 // F6, max pitch of Freddy Mercury
@@ -362,7 +356,7 @@ impl Default for VoiceMasterParams {
                     factor: FloatRange::skew_factor(-1.0),
                 },
             )
-                .with_unit(" Hz"),
+            .with_unit(" Hz"),
 
             hp_freq: FloatParam::new(
                 "High Pass Frequency",
@@ -376,7 +370,7 @@ impl Default for VoiceMasterParams {
                     factor: FloatRange::skew_factor(-1.0),
                 },
             )
-                .with_unit(" Hz"),
+            .with_unit(" Hz"),
             lp_freq: FloatParam::new(
                 "Low Pass Frequency",
                 // A4, max male vocal pitch
@@ -389,7 +383,7 @@ impl Default for VoiceMasterParams {
                     factor: FloatRange::skew_factor(-1.0),
                 },
             )
-                .with_unit(" Hz"),
+            .with_unit(" Hz"),
 
             ok_change: FloatParam::new(
                 "OK Change Rate",
@@ -433,13 +427,11 @@ impl Plugin for VoiceMaster {
 
     const VERSION: &'static str = "0.0.1";
 
-    const AUDIO_IO_LAYOUTS: &'static [AudioIOLayout] = &[
-        AudioIOLayout {
-            main_input_channels: NonZeroU32::new(1),
-            main_output_channels: NonZeroU32::new(3),
-            ..AudioIOLayout::const_default()
-        },
-    ];
+    const AUDIO_IO_LAYOUTS: &'static [AudioIOLayout] = &[AudioIOLayout {
+        main_input_channels: NonZeroU32::new(1),
+        main_output_channels: NonZeroU32::new(3),
+        ..AudioIOLayout::const_default()
+    }];
 
     const SAMPLE_ACCURATE_AUTOMATION: bool = true;
 
@@ -467,8 +459,8 @@ impl Plugin for VoiceMaster {
         // After `PEAK_METER_DECAY_MS` milliseconds of pure silence, the peak meter's value should
         // have dropped by 12 dB
         self.peak_meter_decay_weight = 0.25f64
-                                        .powf((buffer_config.sample_rate as f64 * PEAK_METER_DECAY_MS / 1000.0).recip())
-                                        as f32;
+            .powf((buffer_config.sample_rate as f64 * PEAK_METER_DECAY_MS / 1000.0).recip())
+            as f32;
         self.sample_rate = buffer_config.sample_rate;
 
         // create an EQ for a given sample rate
@@ -476,10 +468,10 @@ impl Plugin for VoiceMaster {
 
         // pYin: None to use default values
         let sr = self.sample_rate as u32; // sampling rate of audio data in Hz
-        // let sr = (self.sample_rate / DOWNSAMPLE_RATIO as f32) as u32; // sampling rate of audio data in Hz
+                                          // let sr = (self.sample_rate / DOWNSAMPLE_RATIO as f32) as u32; // sampling rate of audio data in Hz
         let fmax = 1350.0f64; // maximum frequency in Hz
-        // let frame_length = 2048usize; // frame length in samples
-        // let pad_mode = PadMode::Constant(0.); // Zero-padding is applied on both sides of the signal. (only if cetner is true)
+                              // let frame_length = 2048usize; // frame length in samples
+                              // let pad_mode = PadMode::Constant(0.); // Zero-padding is applied on both sides of the signal. (only if cetner is true)
 
         for i in 0..NR_OF_DETECTORS {
             // let size = 2^i;
@@ -508,13 +500,9 @@ impl Plugin for VoiceMaster {
                     // pitch_range: PITCH_RANGE,
                     ..<_>::default()
                 }).expect("the default parameters should be valid");
-            self.resampler = FftFixedInOut::<f32>::new(
-                self.sample_rate as usize,
-                DOWNSAMPLED_RATE,
-                2048,
-                1,
-
-            ).unwrap();
+            self.resampler =
+                FftFixedInOut::<f32>::new(self.sample_rate as usize, DOWNSAMPLED_RATE, 2048, 1)
+                    .unwrap();
         }
 
         true
@@ -588,7 +576,6 @@ impl Plugin for VoiceMaster {
                         // update the index
                         self.signal_index = (self.signal_index + 1) % MAX_SIZE;
 
-
                         // do overlap nr of times:
                         for i in 0..overlap {
                             // if index[i] == 0
@@ -610,8 +597,8 @@ impl Plugin for VoiceMaster {
                                         &self.signal[self.signal_index..],
                                         &self.signal[..index_plus_size],
                                     ]
-                                        .concat()
-                                        .to_vec();
+                                    .concat()
+                                    .to_vec();
                                 };
 
                                 // resample:
@@ -620,14 +607,13 @@ impl Plugin for VoiceMaster {
                                 // don't resample:
                                 // let mut sample_buffer = VecDeque::from(slice);
 
-
                                 // call the pitchtracker
                                 self.pitch_val = mc_pitch::pitch(
                                     self.sample_rate,
                                     &slice,
                                     &mut self.detectors[(self.params.detector_size.value()
-                                                         as usize
-                                                         - MIN_DETECTOR_SIZE_POWER)],
+                                        as usize
+                                        - MIN_DETECTOR_SIZE_POWER)],
                                     self.params.power_threshold.value(),
                                     // clarity_threshold: use 0.0, so all pitch values are let trough
                                     0.0,
@@ -652,8 +638,13 @@ impl Plugin for VoiceMaster {
                                 // .pyin(array, fill_unvoiced, framing);
 
                                 // call the pitchtracker
-                                let (hz, amplitude) = pitch::detect(&slice.as_slice().iter().map(|&x| x as f64).collect::<Vec<f64>>());
-
+                                let (hz, amplitude) = pitch::detect(
+                                    &slice
+                                        .as_slice()
+                                        .iter()
+                                        .map(|&x| x as f64)
+                                        .collect::<Vec<f64>>(),
+                                );
 
                                 // if clarity is high enough
                                 if self.pitch_val[1] > self.params.clarity_threshold.value()
@@ -664,21 +655,16 @@ impl Plugin for VoiceMaster {
                                     && (hz as f32) < self.params.max_pitch.value()
                                 {
                                     let mut diff = 0.0;
-                                    if (hz as f32) < self.pitch_val[0]
-                                    {
-                                        diff = (1.0-(hz as f32/self.pitch_val[0])).abs();
-                                    }
-                                    else
-                                    {
-                                        diff = (1.0-(self.pitch_val[0]/hz as f32)).abs();
+                                    if (hz as f32) < self.pitch_val[0] {
+                                        diff = (1.0 - (hz as f32 / self.pitch_val[0])).abs();
+                                    } else {
+                                        diff = (1.0 - (self.pitch_val[0] / hz as f32)).abs();
                                     }
                                     if diff < self.params.change_compression.value()
                                     // if (1.0-(hz as f32/self.pitch_val[0])).abs() < 0.79
                                     {
                                         self.final_pitch = self.pitch_val[0];
-                                    }
-                                    else
-                                    {
+                                    } else {
                                         println!(
                                             "mc_pitch: {}, hz: {}, diff: {}, change {}",
                                             self.pitch_val[0],
@@ -720,26 +706,26 @@ impl Plugin for VoiceMaster {
 
                                 // if
                                 // voiced_prob.to_vec()[0] > 0.0
-                                        // && f0.to_vec()[0] > (self.sample_rate/size as f32)
-                                        // {
-                                        // println!(
-                                        // "clarity: {},   pitch: {}, voiced_flag: {}",
-                                        // voiced_prob.to_vec()[0],
-                                        // f0.to_vec()[0],
-                                        // voiced_flag.to_vec()[0]
-                                        // );
-                                        // };
+                                // && f0.to_vec()[0] > (self.sample_rate/size as f32)
+                                // {
+                                // println!(
+                                // "clarity: {},   pitch: {}, voiced_flag: {}",
+                                // voiced_prob.to_vec()[0],
+                                // f0.to_vec()[0],
+                                // voiced_flag.to_vec()[0]
+                                // );
+                                // };
 
-                                        // if voiced_prob.to_vec()[0] > 0.0
-                                        // && f0.to_vec()[0] > (self.sample_rate/size as f32)
-                                        // {
-                                        // self.pitch_val = [f0.to_vec()[0], voiced_prob.to_vec()[0]];
-                                        // }
-                                        // println!("clarity: {},   pitch: {}", self.pitch_val[0],self.pitch_val[1]);
-                                        //-> (Array1<A>, Array1<bool>, Array1<A>)
-                                        // if clarity is high enough
-                                        if self.pitch_val[1] > self.params.clarity_threshold.value()
-                                        // and the pitch isn't too low or too high
+                                // if voiced_prob.to_vec()[0] > 0.0
+                                // && f0.to_vec()[0] > (self.sample_rate/size as f32)
+                                // {
+                                // self.pitch_val = [f0.to_vec()[0], voiced_prob.to_vec()[0]];
+                                // }
+                                // println!("clarity: {},   pitch: {}", self.pitch_val[0],self.pitch_val[1]);
+                                //-> (Array1<A>, Array1<bool>, Array1<A>)
+                                // if clarity is high enough
+                                if self.pitch_val[1] > self.params.clarity_threshold.value()
+                                // and the pitch isn't too low or too high
                                     && self.pitch_val[0] > self.params.min_pitch.value()
                                     && self.pitch_val[0] < self.params.max_pitch.value()
                                 {
@@ -772,16 +758,16 @@ impl Plugin for VoiceMaster {
                                     // self.previous_pitch = self.pitch_val[0];
                                     // if (ratio - ratioo).abs() > 0.05 {
                                     // println!(
-                                        // "ratio: {} change: {} change-ok: {} sign: {} sp: {} ratioo: {}",
-                                        // ratio,
-                                        // change,
-                                        // change - self.params.ok_change.value()
-                                        // ,
-                                        // sign,
-                                        // sp,
-                                        // ratioo,
-                                        // );
-                                    };
+                                    // "ratio: {} change: {} change-ok: {} sign: {} sp: {} ratioo: {}",
+                                    // ratio,
+                                    // change,
+                                    // change - self.params.ok_change.value()
+                                    // ,
+                                    // sign,
+                                    // sp,
+                                    // ratioo,
+                                    // );
+                                };
                                 // } else {
                                 // update the pitches
                                 // self.pitches[self.median_index] = self.pitch_val[0];
@@ -790,8 +776,8 @@ impl Plugin for VoiceMaster {
                                 // % (self.params.median_nr.value() as usize);
                                 // nih_trace!(
                                 // "i: {}, Frequency: {}, Clarity: {}",
-                                    // i, self.pitch_val[0], self.pitch_val[1]
-                                    // );
+                                // i, self.pitch_val[0], self.pitch_val[1]
+                                // );
                                 // };
                                 // self.previous_pitch = self.pitches[self.median_index];
                             }
@@ -822,7 +808,7 @@ impl Plugin for VoiceMaster {
                     _ => panic!("Why are we here?"),
                 }
                 // next channel
-                const NR_OUTPUT_CHANNELS : i32 = 3;
+                const NR_OUTPUT_CHANNELS: i32 = 3;
                 channel_counter = (channel_counter + 1) % NR_OUTPUT_CHANNELS;
             }
 
