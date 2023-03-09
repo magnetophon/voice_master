@@ -20,6 +20,10 @@
    <plug>out_0</plug>
    <plug>out_1</plug>
   </socket>
+  <socket client="FMvocoderSlave" type="jack-audio" exclusive="off" name="FMvocoderSlave">
+   <plug>out_0</plug>
+   <plug>out_1</plug>
+  </socket>
   <socket client="Midi\-Bridge" type="jack-midi" exclusive="off" name="Midi-Bridge">
    <plug>Midi\ Through\:\(capture_0\)\ Midi\ Through\ Port\-0</plug>
   </socket>
@@ -40,6 +44,11 @@
    <plug>in_1</plug>
    <plug>in_2</plug>
   </socket>
+  <socket client="FMvocoderSlave" type="jack-audio" exclusive="off" name="FMvocoderSlave">
+   <plug>in_0</plug>
+   <plug>in_1</plug>
+   <plug>in_2</plug>
+  </socket>
   <socket client="Midi\-Bridge" type="jack-midi" exclusive="off" name="Midi-Bridge">
    <plug>Midi\ Through\:\(playback_0\)\ Midi\ Through\ Port\-0</plug>
   </socket>
@@ -50,6 +59,7 @@
  <slots/>
  <cables>
   <cable input="FOFvocoderSlave" type="jack-audio" output="voice_master"/>
+  <cable input="FMvocoderSlave" type="jack-audio" output="voice_master"/>
   <cable input="voice_master" type="jack-audio" output="mpv"/>
   <cable input="Built-in Audio Analog Stereo" type="jack-audio" output="FOFvocoderSlave"/>
  </cables>
