@@ -533,22 +533,26 @@ impl Plugin for VoiceMaster {
                                 // );
 
                                 // call the pitchtracker
-                                let detector = &mut self.detectors[self.params.detector_size.value() as usize - MIN_DETECTOR_SIZE_POWER];
+                                let detector = &mut self.detectors[self.params.detector_size.value()
+                                    as usize
+                                    - MIN_DETECTOR_SIZE_POWER];
                                 self.pitch_val = mc_pitch::pitch(
                                     self.sample_rate,
                                     &self.overlap_signal,
                                     // &resampled.clone(),
                                     detector,
                                     self.params.power_threshold.value(),
-                                    // clarity_threshold: use 0.0, so all pitch values are let trough
+                                    // clarity_threshold: use 0.0, so all pitch & clarity values are let trough
+                                    // we filter them downstream
                                     0.0,
                                     self.params.pick_threshold.value(),
                                 );
 
                                 // call the other pitchtracker
                                 let (hz, _amplitude) = detect(
-                                    &self.overlap_signal
-                                    // &resampled.clone()
+                                    &self
+                                        .overlap_signal
+                                        // &resampled.clone()
                                         .as_slice()
                                         .iter()
                                         .map(|&x| x as f64)
@@ -563,14 +567,12 @@ impl Plugin for VoiceMaster {
                                     && (hz as f32) > self.params.min_pitch.value()
                                     && (hz as f32) < self.params.max_pitch.value()
                                 {
-                                    let diff : f32 =
-                                        if (hz as f32) < self.pitch_val[0] {
-                                            (1.0 - (hz as f32 / self.pitch_val[0])).abs()
-                                        } else {
-                                            (1.0 - (self.pitch_val[0] / hz as f32)).abs()
-                                        };
-                                    if diff < self.params.max_diff.value()
-                                    {
+                                    let diff: f32 = if (hz as f32) < self.pitch_val[0] {
+                                        (1.0 - (hz as f32 / self.pitch_val[0])).abs()
+                                    } else {
+                                        (1.0 - (self.pitch_val[0] / hz as f32)).abs()
+                                    };
+                                    if diff < self.params.max_diff.value() {
                                         self.final_pitch = self.pitch_val[0];
                                     }
                                     // else {
@@ -584,17 +586,16 @@ impl Plugin for VoiceMaster {
                                     // };
                                 };
                             }
-
                         }
                     }
-                        // positive saw at 1/4 freq, see https://github.com/magnetophon/VoiceOfFaust/blob/V1.1.4/lib/master.lib#L8
-                        1 => {
-                            *sample = self.previous_saw + (self.final_pitch / (self.sample_rate * 4.0));
-                            *sample -= (*sample).floor();
-                            self.previous_saw = *sample
-                        }
-                        // clarity:
-                        2 => *sample = self.pitch_val[1],
+                    // positive saw at 1/4 freq, see https://github.com/magnetophon/VoiceOfFaust/blob/V1.1.4/lib/master.lib#L8
+                    1 => {
+                        *sample = self.previous_saw + (self.final_pitch / (self.sample_rate * 4.0));
+                        *sample -= (*sample).floor();
+                        self.previous_saw = *sample
+                    }
+                    // clarity:
+                    2 => *sample = self.pitch_val[1],
                     // never happens:
                     _ => panic!("Why are we here?"),
                 }
