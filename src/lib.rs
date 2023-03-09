@@ -10,6 +10,7 @@ use rubato::{FftFixedInOut, Resampler};
 
 use pitch::detect;
 use pitch_detection::detector::mcleod::McLeodDetector;
+use pitch_detection::detector::yin::YINDetector;
 
 mod editor;
 mod mc_pitch;
@@ -106,12 +107,15 @@ pub struct VoiceMaster {
     overlap_signal: Vec<f32>,
     /// the curent pitch and clarity
     pitch_val: [f32; 2],
+    /// the curent pitch and clarity
+    pitch_val_yin: [f32; 2],
     /// previous value of the output saw, to calculate the new one from
     previous_saw: f32,
     /// the final pitch that we are using
     final_pitch: f32,
     /// an array of pitch detectors, one for each size:
     detectors: [McLeodDetector<f32>; NR_OF_DETECTORS],
+    detectors_yin: [YINDetector<f32>; NR_OF_DETECTORS],
     eq: Equalizer<f32>,
     resampler: FftFixedInOut<f32>,
 }
@@ -180,6 +184,7 @@ impl Default for VoiceMaster {
             signal_index: 0,
             overlap_signal: vec![0.0; MAX_SIZE],
             pitch_val: [-1.0, 0.0],
+            pitch_val_yin: [-1.0, 0.0],
             previous_saw: 0.0,
             final_pitch: 0.0,
             // they wil get the real size later
@@ -192,6 +197,16 @@ impl Default for VoiceMaster {
                 McLeodDetector::new(2, 1),
                 McLeodDetector::new(2, 1),
                 McLeodDetector::new(2, 1),
+            ],
+            detectors_yin: [
+                YINDetector::new(2, 1),
+                YINDetector::new(2, 1),
+                YINDetector::new(2, 1),
+                YINDetector::new(2, 1),
+                YINDetector::new(2, 1),
+                YINDetector::new(2, 1),
+                YINDetector::new(2, 1),
+                YINDetector::new(2, 1),
             ],
             eq: Equalizer::new(48000.0),
 
@@ -385,6 +400,7 @@ impl Plugin for VoiceMaster {
             let size = 2_usize.pow((i + MIN_DETECTOR_SIZE_POWER) as u32);
             let padding = size / 2;
             self.detectors[i] = McLeodDetector::new(size, padding);
+            self.detectors_yin[i] = YINDetector::new(size, padding);
         }
 
         true
@@ -482,10 +498,11 @@ impl Plugin for VoiceMaster {
                                 // );
 
                                 // call the pitchtracker
-                                let detector = &mut self.detectors[self.params.detector_size.value()
-                                    as usize
-                                    - MIN_DETECTOR_SIZE_POWER];
-                                self.pitch_val = mc_pitch::pitch(
+                                let size_index = self.params.detector_size.value() as usize
+                                    - MIN_DETECTOR_SIZE_POWER;
+                                let detector = &mut self.detectors[size_index];
+                                let detector_yin = &mut self.detectors_yin[size_index];
+                                self.pitch_val_yin = mc_pitch::pitch(
                                     self.sample_rate,
                                     &self.overlap_signal,
                                     // &resampled.clone(),
@@ -498,6 +515,14 @@ impl Plugin for VoiceMaster {
                                     self.params.pick_threshold.value(),
                                 );
 
+                                self.pitch_val = mc_pitch::pitch(
+                                    self.sample_rate,
+                                    &self.overlap_signal,
+                                    detector_yin,
+                                    self.params.power_threshold.value(),
+                                    self.params.clarity_threshold.value(),
+                                    self.params.pick_threshold.value(),
+                                );
                                 // call the other pitchtracker
                                 let (hz, _amplitude) = detect(
                                     &self
@@ -599,4 +624,4 @@ impl Vst3Plugin for VoiceMaster {
 }
 
 // nih_export_clap!(VoiceMaster);
-nih_export_vst3!(VoiceMaster);
+// nih_export_vst3!(VoiceMaster);

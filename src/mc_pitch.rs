@@ -1,11 +1,9 @@
-use pitch_detection::detector::mcleod::McLeodDetector;
 use pitch_detection::detector::PitchDetector;
 
-// pub(crate) fn pitch(sample_rate: f32, signal: &Vec<f32>, optional_pitch: &mut Option<Pitch<f32>>, mut pitch_val: [f32; 2], detector: &mut McLeodDetector<f32>) -> [f32; 2] {
 pub(crate) fn pitch(
     sample_rate: f32,
     signal: &Vec<f32>,
-    detector: &mut McLeodDetector<f32>,
+    detector: &mut dyn PitchDetector<f32>,
     power_threshold: f32,
     clarity_threshold: f32,
     pick_threshold: f32,
