@@ -16,9 +16,6 @@ mod mc_pitch;
 
 // TODO:
 //
-// remove the 32 copies and just use one writepointer and 32 read pointers
-// make than nr variable
-// make that variable dependent on detector-size, so we  always get the same nr of pitches per second
 //
 // compare pitch trackers:
 // https://docs.rs/pyin/1.0.2/pyin/
@@ -38,6 +35,8 @@ mod mc_pitch;
 //   - no override
 //   - use last pitch
 //   - use midi input
+//   - use midi input as an offset
+//   - use midi input as an offset, polyphonic -> Jacob Colier
 //
 // for the vibrato during hold, add an LFO that get's it's pitch from
 // a separte pitchtracker that works as follows:
