@@ -111,6 +111,8 @@ pub struct VoiceMaster {
     signal: Vec<f32>,
     /// the sample index of the above signal
     signal_index: usize,
+    /// ovelapping segments of the signal, to feed the pitchtrackers
+    overlap_signal: Vec<f32>,
     /// the curent pitch and clarity
     pitch_val: [f32; 2],
     /// vector of pitches to pick the median from
@@ -200,6 +202,7 @@ impl Default for VoiceMaster {
             delay_line: vec![0.0; MAX_SIZE],
             signal: vec![0.0; MAX_SIZE],
             signal_index: 0,
+            overlap_signal: vec![0.0; MAX_SIZE],
             pitch_val: [-1.0, 0.0],
             pitches: vec![0.0; MAX_MEDIAN_NR],
             median_index: 0,
@@ -585,14 +588,14 @@ impl Plugin for VoiceMaster {
                                 // [ &v[..3], &v[l - 3..]].concat()
                                 // check if the end wraps around:
                                 let index_plus_size = (self.signal_index + size) % MAX_SIZE;
-                                let mut slice  : Vec<f32> = Vec::with_capacity(MAX_SIZE);
+                                // let mut slice  : Vec<f32> = Vec::with_capacity(MAX_SIZE);
                                 // if no wrap around:
                                 if (self.signal_index) < index_plus_size {
-                                    slice =
+                                    self.overlap_signal =
                                         self.signal[self.signal_index..index_plus_size].to_vec();
                                     // if we do have a wrap around:
                                 } else {
-                                    slice = [
+                                    self.overlap_signal = [
                                         &self.signal[self.signal_index..],
                                         &self.signal[..index_plus_size],
                                     ]
@@ -601,19 +604,19 @@ impl Plugin for VoiceMaster {
                                 };
 
                                 // resample:
-                                let mut resampled : Vec<f32> = Vec::with_capacity(MAX_SIZE);
-                                self.resampler.process_into_buffer(
-                                    &[slice; 1],
-                                    &mut [resampled],
-                                    None,
-                                );
+                                // let mut resampled : Vec<f32> = Vec::with_capacity(MAX_SIZE);
+                                // self.resampler.process_into_buffer(
+                                //     &[slice; 1],
+                                //     &mut [resampled],
+                                //     None,
+                                // );
 
                                 // call the pitchtracker
                                 let detector = &mut self.detectors[self.params.detector_size.value() as usize - MIN_DETECTOR_SIZE_POWER];
                                 self.pitch_val = mc_pitch::pitch(
                                     self.sample_rate,
-                                    // &slice,
-                                    &resampled.clone(),
+                                    &self.overlap_signal,
+                                    // &resampled.clone(),
                                     detector,
                                     self.params.power_threshold.value(),
                                     // clarity_threshold: use 0.0, so all pitch values are let trough
@@ -623,9 +626,9 @@ impl Plugin for VoiceMaster {
 
                                 // call the other pitchtracker
                                 let (hz, _amplitude) = detect(
-                                    // &slice
-                                    &resampled.clone()
-                                              .as_slice()
+                                    &self.overlap_signal
+                                    // &resampled.clone()
+                                        .as_slice()
                                         .iter()
                                         .map(|&x| x as f64)
                                         .collect::<Vec<f64>>(),
