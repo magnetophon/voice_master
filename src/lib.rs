@@ -178,8 +178,8 @@ struct VoiceMasterParams {
     pub hp_freq: FloatParam,
     #[id = "lp_freq"]
     pub lp_freq: FloatParam,
-    #[id = "max_ratio"]
-    pub max_ratio: FloatParam,
+    #[id = "max_diff"]
+    pub max_diff: FloatParam,
     #[id = "latency"]
     pub latency: BoolParam,
 }
@@ -371,8 +371,8 @@ impl Default for VoiceMasterParams {
                 },
             )
             .with_unit(" Hz"),
-            max_ratio: FloatParam::new(
-                "max ratio",
+            max_diff: FloatParam::new(
+                "Maximum Difference",
                 0.79,
                 FloatRange::Skewed {
                     min: 0.0,
@@ -569,7 +569,7 @@ impl Plugin for VoiceMaster {
                                         } else {
                                             (1.0 - (self.pitch_val[0] / hz as f32)).abs()
                                         };
-                                    if diff < self.params.max_ratio.value()
+                                    if diff < self.params.max_diff.value()
                                     {
                                         self.final_pitch = self.pitch_val[0];
                                     }
@@ -579,7 +579,7 @@ impl Plugin for VoiceMaster {
                                     // self.pitch_val[0],
                                     // hz,
                                     // diff,
-                                    // self.params.max_ratio.value()
+                                    // self.params.max_diff.value()
                                     // );
                                     // };
                                 };
