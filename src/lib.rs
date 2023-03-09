@@ -2,13 +2,6 @@ use atomic_float::AtomicF32;
 
 use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
-// use pitch_detection::detector::mcleod::McLeodDetector;
-// use pyin::PadMode::Constant;
-// use pyin::{Framing, PYINExecutor};
-
-use irapt::{Irapt, Parameters};
-// use std::collections::VecDeque;
-
 // use simple_eq::design::Curve;
 use simple_eq::*;
 use std::sync::Arc;
@@ -86,8 +79,6 @@ const MAX_SIZE: usize = 2_usize.pow(MAX_DETECTOR_SIZE_POWER as u32);
 /// the maximum nr of times the detector is updated each 2048 samples
 const MAX_OVERLAP: usize = 512;
 /// The median is taken from at max this nr of pitches
-const MAX_MEDIAN_NR: usize = 32;
-const MEDIAN_NR_DEFAULT: i32 = 1;
 const DOWNSAMPLE_RATIO: usize = 8;
 const DOWNSAMPLED_RATE: usize = 6000;
 
@@ -115,20 +106,12 @@ pub struct VoiceMaster {
     overlap_signal: Vec<f32>,
     /// the curent pitch and clarity
     pitch_val: [f32; 2],
-    /// vector of pitches to pick the median from
-    pitches: Vec<f32>,
-    /// index into "pitches", to use it as a ringbuffer
-    median_index: usize,
     /// previous value of the output saw, to calculate the new one from
     previous_saw: f32,
-    /// previous value of the raw pitch detector, to calculate the change rate from
-    previous_pitch: f32,
     /// the final pitch that we are using
     final_pitch: f32,
     /// an array of pitch detectors, one for each size:
     detectors: [McLeodDetector<f32>; NR_OF_DETECTORS],
-    // pyin_exec: [PYINExecutor<f32>; NR_OF_DETECTORS],
-    irapt: Irapt,
     eq: Equalizer<f32>,
     resampler: FftFixedInOut<f32>,
 }
@@ -197,10 +180,7 @@ impl Default for VoiceMaster {
             signal_index: 0,
             overlap_signal: vec![0.0; MAX_SIZE],
             pitch_val: [-1.0, 0.0],
-            pitches: vec![0.0; MAX_MEDIAN_NR],
-            median_index: 0,
             previous_saw: 0.0,
-            previous_pitch: -1.0,
             final_pitch: 0.0,
             // they wil get the real size later
             detectors: [
@@ -213,45 +193,13 @@ impl Default for VoiceMaster {
                 McLeodDetector::new(2, 1),
                 McLeodDetector::new(2, 1),
             ],
-            // pyin_exec: [
-            // PYINExecutor::new(750.0, 1350.0, 48000, 64, None, None, None),
-            // PYINExecutor::new(375.0, 1350.0, 48000, 128, None, None, None),
-            // PYINExecutor::new(187.5, 1350.0, 48000, 256, None, None, None),
-            // PYINExecutor::new(93.75, 1350.0, 48000, 512, None, None, None),
-            // PYINExecutor::new(46.875, 1350.0, 48000, 1024, None, None, None),
-            // PYINExecutor::new(23.4375, 1350.0, 48000, 2048, None, None, None),
-            // PYINExecutor::new(11.71875, 1350.0, 48000, 4096, None, None, None),
-            // PYINExecutor::new(5.859375, 1350.0, 48000, 8192, None, None, None),
-            // ],
             eq: Equalizer::new(48000.0),
 
-            // let parameters = Parameters::default();
-
-            // irapt:  Irapt::new(Parameters::default().clone()),
-            // irapt:  Irapt { parameters: val, estimator: val, candidate_generator: val, candidate_selector: val },
-
-            // irapt: Irapt::new(irapt::Parameters {
-            // sample_rate: downsampled_rate,
-            // pitch_range: PITCH_RANGE,
-            // ..<_>::default()
-            // })
-            irapt: Irapt::new(Parameters::default().clone())
-                .expect("the default parameters should be valid"),
             resampler: FftFixedInOut::<f32>::new(48000, DOWNSAMPLED_RATE, 2048, 1).unwrap(),
         }
     }
 }
 
-//at 48k, these freq ranges work:
-// 107 - 114
-// 173 - 236
-// 291 - 292
-// 352 - 471
-// 536 - 536
-// 716 - 1181  -> reports one octave too low
-// 1331 - 1779  -> reports 1/3 of the actual freq
-// 1927 - 3997  -> reports 1/4 of the actual freq
-//
 impl Default for VoiceMasterParams {
     fn default() -> Self {
         Self {
@@ -543,7 +491,8 @@ impl Plugin for VoiceMaster {
                                     detector,
                                     self.params.power_threshold.value(),
                                     // clarity_threshold: use 0.0, so all pitch & clarity values are let trough
-                                    // we filter them downstream
+                                    // we filter the pitches downstream but let all clarity values trough,
+                                    // for usage in the faust de-esser and re-esser
                                     0.0,
                                     self.params.pick_threshold.value(),
                                 );
@@ -649,4 +598,4 @@ impl Vst3Plugin for VoiceMaster {
 }
 
 // nih_export_clap!(VoiceMaster);
-// nih_export_vst3!(VoiceMaster);
+nih_export_vst3!(VoiceMaster);
