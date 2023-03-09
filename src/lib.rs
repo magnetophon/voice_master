@@ -2,8 +2,8 @@ use atomic_float::AtomicF32;
 
 use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
-// use simple_eq::design::Curve;
-use simple_eq::*;
+use simple_eq::design::Curve;
+use simple_eq::Equalizer;
 use std::sync::Arc;
 
 use rubato::{FftFixedInOut, Resampler};
@@ -408,10 +408,10 @@ impl Plugin for VoiceMaster {
         }
 
         // set the filter frequencies
-        // self.eq
-        // .set(0, Curve::Highpass, self.params.hp_freq.value(), 1.0, 0.0);
-        // self.eq
-        // .set(1, Curve::Lowpass, self.params.lp_freq.value(), 1.0, 0.0);
+        self.eq
+            .set(0, Curve::Highpass, self.params.hp_freq.value(), 1.0, 0.0);
+        self.eq
+            .set(1, Curve::Lowpass, self.params.lp_freq.value(), 1.0, 0.0);
 
         for channel_samples in buffer.iter_samples() {
             let mut amplitude = 0.0;
@@ -431,14 +431,15 @@ impl Plugin for VoiceMaster {
                         self.delay_line[self.signal_index] = *sample;
                         // apply the filters to a copy of the sample
                         // we don't want to filter the main audio output, just the pitch detector input
-                        // let mut sample_filtered = *sample;
-                        // let mut sample_filtered = self.eq.process(*sample);
+                        // let sample_filtered = *sample;
+                        let sample_filtered = self.eq.process(*sample);
 
                         // let mut downsampling_index = self.signal_index % DOWNSAMPLE_RATIO;
-                        // copy our filtered sample to signal
                         // if downsampling_index == 0 {
-                        self.signal[self.signal_index] = *sample;
-                        // self.signal[self.signal_index] = sample_filtered as f32;
+
+                        // copy our filtered sample to signal
+                        // self.signal[self.signal_index] = *sample;
+                        self.signal[self.signal_index] = sample_filtered as f32;
                         // }
                         // if the user chooses to sync up the audio with the pitch
                         if self.params.latency.value() {
