@@ -369,6 +369,7 @@ impl Plugin for VoiceMaster {
         buffer_config: &BufferConfig,
         _context: &mut impl InitContext<Self>,
     ) -> bool {
+        println!("-1");
         // After `PEAK_METER_DECAY_MS` milliseconds of pure silence, the peak meter's value should
         // have dropped by 12 dB
         self.peak_meter_decay_weight = 0.25f64
@@ -395,6 +396,7 @@ impl Plugin for VoiceMaster {
         _aux: &mut AuxiliaryBuffers,
         context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
+        println!("0");
         let mut channel_counter = 0;
         let size = 2_usize.pow((self.params.detector_size.value() as usize) as u32);
         let overlap = self.params.overlap.value() as usize * size / 2048;
@@ -441,9 +443,11 @@ impl Plugin for VoiceMaster {
                         self.signal[self.signal_index] = sample_filtered as f32;
                         // }
                         // if the user chooses to sync up the audio with the pitch
-                        if self.params.latency.value() {
-                            //     // delay our sample
-                            *sample = self.delay_line[(self.signal_index - size) % MAX_SIZE];
+                            if self.params.latency.value() {
+                                if self.signal_index >= size {
+                                    //     // delay our sample
+                                *sample = self.delay_line[(self.signal_index - size) % MAX_SIZE];
+                            }
                         }
 
                         // update the index
@@ -456,20 +460,26 @@ impl Plugin for VoiceMaster {
                             if staggered_index(i, self.signal_index, size, overlap) == 0
                             // && (downsampling_index == 0)
                             {
+                                println!("1");
+                                self.overlap_signal.resize(size, 0.0);
                                 // check if the end wraps around:
                                 let index_plus_size = (self.signal_index + size) % MAX_SIZE;
                                 // if no wrap around:
                                 if (self.signal_index) < index_plus_size {
-                                    self.overlap_signal =
-                                        self.signal[self.signal_index..index_plus_size].to_vec();
+                                    println!("2");
+                                    self.overlap_signal.copy_from_slice(&self.signal[self.signal_index..index_plus_size]);
+                                    println!("3");
                                     // if we do have a wrap around:
                                 } else {
-                                    self.overlap_signal = [
-                                        &self.signal[self.signal_index..],
-                                        &self.signal[..index_plus_size],
-                                    ]
-                                    .concat()
-                                    .to_vec();
+                                    println!("4");
+                                    // self.overlap_signal =
+                                    self.overlap_signal.copy_from_slice(
+                                        &[
+                                            &self.signal[self.signal_index..],
+                                            &self.signal[..index_plus_size],
+                                        ]
+                                            .concat());
+                                    println!("5");
                                 };
 
                                 // resample:
@@ -480,10 +490,11 @@ impl Plugin for VoiceMaster {
                                 //     None,
                                 // );
 
+                                println!("6");
                                 // call the pitchtracker
                                 let detector = &mut self.detectors[self.params.detector_size.value()
-                                    as usize
-                                    - MIN_DETECTOR_SIZE_POWER];
+                                                                   as usize
+                                                                   - MIN_DETECTOR_SIZE_POWER];
                                 self.pitch_val = mc_pitch::pitch(
                                     self.sample_rate,
                                     &self.overlap_signal,
@@ -497,17 +508,19 @@ impl Plugin for VoiceMaster {
                                     self.params.pick_threshold.value(),
                                 );
 
+                                println!("7");
                                 // call the other pitchtracker
                                 let (hz, _amplitude) = detect(
                                     &self
                                         .overlap_signal
-                                        // &resampled.clone()
+                                    // &resampled.clone()
                                         .as_slice()
                                         .iter()
                                         .map(|&x| x as f64)
                                         .collect::<Vec<f64>>(),
                                 );
 
+                                println!("7");
                                 // if clarity is high enough
                                 if self.pitch_val[1] > self.params.clarity_threshold.value()
                                 // and the pitch isn't too low or too high
@@ -516,11 +529,13 @@ impl Plugin for VoiceMaster {
                                     && (hz as f32) > self.params.min_pitch.value()
                                     && (hz as f32) < self.params.max_pitch.value()
                                 {
+                                    println!("8");
                                     let diff: f32 = if (hz as f32) < self.pitch_val[0] {
                                         (1.0 - (hz as f32 / self.pitch_val[0])).abs()
                                     } else {
                                         (1.0 - (self.pitch_val[0] / hz as f32)).abs()
                                     };
+                                    println!("9");
                                     if diff < self.params.max_diff.value() {
                                         self.final_pitch = self.pitch_val[0];
                                     }
@@ -598,4 +613,4 @@ impl Vst3Plugin for VoiceMaster {
 }
 
 // nih_export_clap!(VoiceMaster);
-nih_export_vst3!(VoiceMaster);
+// nih_export_vst3!(VoiceMaster);
