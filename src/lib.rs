@@ -474,6 +474,7 @@ impl Plugin for VoiceMaster {
                                     println!("4");
                                     // self.overlap_signal =
 
+                                    self.overlap_signal.clear();
                                     self.overlap_signal
                                         .extend_from_slice(&self.signal[self.signal_index..]);
                                     self.overlap_signal
