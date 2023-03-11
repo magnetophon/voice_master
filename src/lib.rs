@@ -473,12 +473,11 @@ impl Plugin for VoiceMaster {
                                 } else {
                                     println!("4");
                                     // self.overlap_signal =
-                                    self.overlap_signal.copy_from_slice(
-                                        &[
-                                            &self.signal[self.signal_index..],
-                                            &self.signal[..index_plus_size],
-                                        ]
-                                            .concat());
+
+                                    self.overlap_signal
+                                        .extend_from_slice(&self.signal[self.signal_index..]);
+                                    self.overlap_signal
+                                        .extend_from_slice(&self.signal[..index_plus_size]);
                                     println!("5");
                                 };
 
