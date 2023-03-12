@@ -1970,6 +1970,7 @@ dependencies = [
 [[package]]
 name = "pitch"
 version = "0.2.0"
+source = "git+https://github.com/magnetophon/BCF-pitch-rs.git#d2b5f9564a1d0642e7ea2f426704945b0ca46b08"
 
 [[package]]
 name = "pitch-detection"
