@@ -399,6 +399,7 @@ impl Plugin for VoiceMaster {
         _aux: &mut AuxiliaryBuffers,
         context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
+
         let mut channel_counter = 0;
         let size = 2_usize.pow((self.params.detector_size.value() as usize) as u32);
         let overlap = self.params.overlap.value() as usize * size / 2048;
@@ -510,6 +511,7 @@ impl Plugin for VoiceMaster {
                                     &self.overlap_signal
                                         , &mut self.bin
                                         ,);
+                                // let hz = self.pitch_val[0];
 
                                 // println!("hz: {}",hz);
 
