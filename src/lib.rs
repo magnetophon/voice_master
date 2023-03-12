@@ -480,21 +480,26 @@ impl Plugin for VoiceMaster {
                                         .extend_from_slice(&self.signal[..index_plus_size]);
                                 };
 
+                                println!("MAX_SIZE: {}", MAX_SIZE);
                                 // resample:
-                                // let mut resampled : Vec<f32> = Vec::with_capacity(MAX_SIZE);
-                                // self.resampler.process_into_buffer(
-                                //     &[slice; 1],
-                                //     &mut [resampled],
-                                //     None,
-                                // );
-
+                                let resampled = {
+                                    let resampled = Vec::with_capacity(MAX_SIZE);
+                                    self.resampler.process_into_buffer(
+                                        &[self.overlap_signal.as_mut_slice()],
+                                        &mut [resampled.clone()],
+                                        None,
+                                    ).unwrap();
+                                    resampled
+                                };                                // self.overlap_signal = Vec::from(resampled);
+                                // self.overlap_signal.clear();
+                                // self.overlap_signal.extend_from_slice(&resampled);
                                 // call the pitchtracker
                                 let detector = &mut self.detectors[self.params.detector_size.value()
                                                                    as usize
                                                                    - MIN_DETECTOR_SIZE_POWER];
                                 self.pitch_val = mc_pitch::pitch(
                                     self.sample_rate,
-                                    &self.overlap_signal,
+                                    &resampled,
                                     // &resampled.clone(),
                                     detector,
                                     self.params.power_threshold.value(),
@@ -508,7 +513,7 @@ impl Plugin for VoiceMaster {
                                 // call the other pitchtracker
                                 let (hz, _amplitude) = detect(
                                     // &self.overlap_signal .as_slice().iter().map(|&x| x as f64).collect::<Vec<f64>>()
-                                    &self.overlap_signal
+                                    &resampled
                                         , &mut self.bin
                                         ,);
                                 // let hz = self.pitch_val[0];
