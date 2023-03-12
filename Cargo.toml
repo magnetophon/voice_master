@@ -28,7 +28,8 @@ atomic_float = "0.1"
 
 # pitch-detection = "0.3.0"
 pitch-detection = { git = "https://github.com/magnetophon/pitch-detection.git" }
-pitch = { git = "https://gitlab.com/plopgrizzly/audio/pitch.git" }
+# pitch = { git = "https://gitlab.com/plopgrizzly/audio/pitch.git" }
+pitch = { path = "/home/bart/.cargo/git/checkouts/pitch-feec4d0f91a18439/83a2568/" }
 
 rubato = "0.12"
 
