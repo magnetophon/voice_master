@@ -1970,7 +1970,6 @@ dependencies = [
 [[package]]
 name = "pitch"
 version = "0.2.0"
-source = "git+https://gitlab.com/plopgrizzly/audio/pitch.git#83a256831686ead98cbf29b7c663a76446433c6b"
 
 [[package]]
 name = "pitch-detection"
