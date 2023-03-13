@@ -81,7 +81,7 @@ const MAX_SIZE: usize = 2_usize.pow(MAX_DETECTOR_SIZE_POWER as u32);
 const MAX_OVERLAP: usize = 512;
 /// The median is taken from at max this nr of pitches
 const DEFAULT_SAMPLERATE: usize = 48000;
-const DOWNSAMPLE_RATIO: usize = 8;
+const DOWNSAMPLE_RATIO: usize = 4;
 const DOWNSAMPLED_RATE: usize = DEFAULT_SAMPLERATE / DOWNSAMPLE_RATIO;
 
 /// This is mostly identical to the gain example, minus some fluff, and with a GUI.
