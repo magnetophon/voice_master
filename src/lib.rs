@@ -392,7 +392,6 @@ impl Plugin for VoiceMaster {
         _aux: &mut AuxiliaryBuffers,
         context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
-
         let mut channel_counter = 0;
         let size = 2_usize.pow((self.params.detector_size.value() as usize) as u32);
         let overlap = self.params.overlap.value() as usize * size / 2048;
@@ -439,9 +438,9 @@ impl Plugin for VoiceMaster {
                         self.signal[self.signal_index] = sample_filtered as f32;
                         // }
                         // if the user chooses to sync up the audio with the pitch
-                            if self.params.latency.value() {
-                                if self.signal_index >= size {
-                                    //     // delay our sample
+                        if self.params.latency.value() {
+                            if self.signal_index >= size {
+                                //     // delay our sample
                                 *sample = self.delay_line[(self.signal_index - size) % MAX_SIZE];
                             }
                         }
@@ -461,7 +460,9 @@ impl Plugin for VoiceMaster {
                                 let index_plus_size = (self.signal_index + size) % MAX_SIZE;
                                 // if no wrap around:
                                 if (self.signal_index) < index_plus_size {
-                                    self.overlap_signal.copy_from_slice(&self.signal[self.signal_index..index_plus_size]);
+                                    self.overlap_signal.copy_from_slice(
+                                        &self.signal[self.signal_index..index_plus_size],
+                                    );
                                     // if we do have a wrap around:
                                 } else {
                                     // self.overlap_signal =
@@ -475,8 +476,8 @@ impl Plugin for VoiceMaster {
 
                                 // call the pitchtracker
                                 let detector = &mut self.detectors[self.params.detector_size.value()
-                                                                   as usize
-                                                                   - MIN_DETECTOR_SIZE_POWER];
+                                    as usize
+                                    - MIN_DETECTOR_SIZE_POWER];
                                 self.pitch_val = mc_pitch::pitch(
                                     self.sample_rate,
                                     &self.overlap_signal,
@@ -493,9 +494,9 @@ impl Plugin for VoiceMaster {
                                 // call the other pitchtracker
                                 let (hz, _amplitude) = detect(
                                     // &self.overlap_signal .as_slice().iter().map(|&x| x as f64).collect::<Vec<f64>>()
-                                    &self.overlap_signal
-                                        , &mut self.bin
-                                        ,);
+                                    &self.overlap_signal,
+                                    &mut self.bin,
+                                );
                                 // let hz = self.pitch_val[0];
 
                                 // println!("hz: {}",hz);
