@@ -61,10 +61,10 @@ mod mc_pitch;
 const PEAK_METER_DECAY_MS: f64 = 150.0;
 
 /// Blocksize of the detector, determines the lowest pitch that can be detected at a given samplerate.
-/// 2^6 = 64 samples
-/// 44100/64 = 689 Hz at a samplerate of 44.1k
+/// 2^7 = 128 samples
+/// 44100/128 = 345 Hz at a samplerate of 44.1k
 /// for when you want to track your picolo flute with really low latency!
-const MIN_DETECTOR_SIZE_POWER: usize = 6;
+const MIN_DETECTOR_SIZE_POWER: usize = 7;
 // const MIN_DETECTOR_SIZE_POWER: usize = 11;
 /// 2^13 = 8192
 /// 192000/8192 = 23.4Hz at a samplerate of 192k
@@ -73,6 +73,7 @@ const MAX_DETECTOR_SIZE_POWER: usize = 13;
 // const MAX_DETECTOR_SIZE_POWER: usize = 11;
 /// the number of detectors we need, one for each size
 const NR_OF_DETECTORS: usize = MAX_DETECTOR_SIZE_POWER - MIN_DETECTOR_SIZE_POWER + 1;
+/// the maximum size of the detectors
 const MAX_SIZE: usize = 2_usize.pow(MAX_DETECTOR_SIZE_POWER as u32);
 /// the maximum nr of times the detector is updated each 2048 samples
 const MAX_OVERLAP: usize = 512;
@@ -188,7 +189,6 @@ impl Default for VoiceMaster {
                 McLeodDetector::new(2, 1),
                 McLeodDetector::new(2, 1),
                 McLeodDetector::new(2, 1),
-                McLeodDetector::new(2, 1),
             ],
             eq: Equalizer::new(48000.0),
         }
@@ -237,7 +237,7 @@ impl Default for VoiceMasterParams {
                     max: MAX_OVERLAP as i32,
                 },
             )
-            .with_unit(" times/2048"),
+            .with_unit(" times/buffer"),
 
             power_threshold: FloatParam::new(
                 "Power Threshold",
@@ -394,7 +394,7 @@ impl Plugin for VoiceMaster {
     ) -> ProcessStatus {
         let mut channel_counter = 0;
         let size = 2_usize.pow((self.params.detector_size.value() as usize) as u32);
-        let overlap = self.params.overlap.value() as usize * size / 2048;
+        let overlap = self.params.overlap.value() as usize;
 
         // set the latency, cannot do that from a callback
         if self.params.latency.value() {
