@@ -77,6 +77,8 @@ const NR_OF_DETECTORS: usize = MAX_DETECTOR_SIZE_POWER - MIN_DETECTOR_SIZE_POWER
 const MAX_SIZE: usize = 2_usize.pow(MAX_DETECTOR_SIZE_POWER as u32);
 /// the maximum nr of times the detector is updated each 2048 samples
 const MAX_OVERLAP: usize = 512;
+/// default samplerate
+const DEFAULT_SAMPLERATE: f32 = 48000.0;
 
 /// This is mostly identical to the gain example, minus some fluff, and with a GUI.
 pub struct VoiceMaster {
@@ -190,7 +192,7 @@ impl Default for VoiceMaster {
                 McLeodDetector::new(2, 1),
                 McLeodDetector::new(2, 1),
             ],
-            eq: Equalizer::new(48000.0),
+            eq: Equalizer::new(DEFAULT_SAMPLERATE),
         }
     }
 }
@@ -492,11 +494,12 @@ impl Plugin for VoiceMaster {
                                 );
 
                                 // call the other pitchtracker
-                                let (hz, _amplitude) = detect(
+                                let (hz_raw, _amplitude) = detect(
                                     // &self.overlap_signal .as_slice().iter().map(|&x| x as f64).collect::<Vec<f64>>()
                                     &self.overlap_signal,
                                     &mut self.bin,
                                 );
+                                let hz = hz_raw * DEFAULT_SAMPLERATE / self.sample_rate;
                                 // let hz = self.pitch_val[0];
 
                                 // println!("hz: {}",hz);
