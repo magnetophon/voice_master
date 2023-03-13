@@ -239,7 +239,7 @@ impl Default for VoiceMasterParams {
 
             overlap: IntParam::new(
                 "Overlap",
-                128,
+                512,
                 IntRange::Linear {
                     min: 1,
                     max: MAX_OVERLAP as i32,
@@ -249,20 +249,21 @@ impl Default for VoiceMasterParams {
 
             power_threshold: FloatParam::new(
                 "Power Threshold",
-                1.0,
-                FloatRange::Linear {
+                0.13,
+                FloatRange::Skewed {
                     min: 0.0,
                     max: 10.0,
+                    factor: FloatRange::skew_factor(-2.0),
                 },
             ),
             clarity_threshold: FloatParam::new(
                 "Clarity Threshold",
-                0.55,
+                0.7,
                 FloatRange::Linear { min: 0.0, max: 1.0 },
             ),
             pick_threshold: FloatParam::new(
                 "Pick Threshold",
-                0.999,
+                0.98,
                 FloatRange::Skewed {
                     min: 0.8,
                     max: 1.0,
@@ -324,11 +325,11 @@ impl Default for VoiceMasterParams {
             .with_unit(" Hz"),
             max_diff: FloatParam::new(
                 "Maximum Difference",
-                0.79,
+                0.13,
                 FloatRange::Skewed {
                     min: 0.0,
                     max: 1.0,
-                    factor: FloatRange::skew_factor(2.0),
+                    factor: FloatRange::skew_factor(-2.0),
                 },
             ),
             latency: BoolParam::new("Latency", true),
