@@ -31,10 +31,9 @@ pitch-detection = { git = "https://github.com/magnetophon/pitch-detection.git" }
 # pitch = { git = "https://gitlab.com/plopgrizzly/audio/pitch.git" }
 pitch = { git = "https://github.com/magnetophon/BCF-pitch-rs.git" }
 
-
-rubato = "0.12"
-
 simple-eq = { git = "https://github.com/m-hilgendorf/simple-eq.git" }
+
+realfft = "3.2.0"
 
 [profile.release]
 lto = "thin"

@@ -2242,18 +2242,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rubato"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd70209c27d5b08f5528bdc779ea3ffb418954e28987f9f9775c6eac41003f9c"
-dependencies = [
- "num-complex 0.4.3",
- "num-integer",
- "num-traits",
- "realfft",
-]
-
-[[package]]
 name = "rustc-demangle"
 version = "0.1.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2865,7 +2853,7 @@ dependencies = [
  "nih_plug_vizia",
  "pitch",
  "pitch-detection",
- "rubato",
+ "realfft",
  "simple-eq",
 ]
 

@@ -6,8 +6,6 @@ use simple_eq::design::Curve;
 use simple_eq::Equalizer;
 use std::sync::Arc;
 
-use rubato::{FftFixedInOut, Resampler};
-
 use pitch::detect;
 use pitch::BitStream;
 use pitch_detection::detector::mcleod::McLeodDetector;
@@ -78,9 +76,6 @@ const NR_OF_DETECTORS: usize = MAX_DETECTOR_SIZE_POWER - MIN_DETECTOR_SIZE_POWER
 const MAX_SIZE: usize = 2_usize.pow(MAX_DETECTOR_SIZE_POWER as u32);
 /// the maximum nr of times the detector is updated each 2048 samples
 const MAX_OVERLAP: usize = 512;
-/// The median is taken from at max this nr of pitches
-const DOWNSAMPLE_RATIO: usize = 8;
-const DOWNSAMPLED_RATE: usize = 6000;
 
 /// This is mostly identical to the gain example, minus some fluff, and with a GUI.
 pub struct VoiceMaster {
@@ -115,7 +110,6 @@ pub struct VoiceMaster {
     /// an array of pitch detectors, one for each size:
     detectors: [McLeodDetector<f32>; NR_OF_DETECTORS],
     eq: Equalizer<f32>,
-    resampler: FftFixedInOut<f32>,
 }
 
 #[derive(Params)]
@@ -197,8 +191,6 @@ impl Default for VoiceMaster {
                 McLeodDetector::new(2, 1),
             ],
             eq: Equalizer::new(48000.0),
-
-            resampler: FftFixedInOut::<f32>::new(48000, DOWNSAMPLED_RATE, 2048, 1).unwrap(),
         }
     }
 }
@@ -480,14 +472,6 @@ impl Plugin for VoiceMaster {
                                     self.overlap_signal
                                         .extend_from_slice(&self.signal[..index_plus_size]);
                                 };
-
-                                // resample:
-                                // let mut resampled : Vec<f32> = Vec::with_capacity(MAX_SIZE);
-                                // self.resampler.process_into_buffer(
-                                //     &[slice; 1],
-                                //     &mut [resampled],
-                                //     None,
-                                // );
 
                                 // call the pitchtracker
                                 let detector = &mut self.detectors[self.params.detector_size.value()
