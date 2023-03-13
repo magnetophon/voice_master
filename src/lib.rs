@@ -81,7 +81,7 @@ const MAX_SIZE: usize = 2_usize.pow(MAX_DETECTOR_SIZE_POWER as u32);
 const MAX_OVERLAP: usize = 512;
 /// The median is taken from at max this nr of pitches
 const DEFAULT_SAMPLERATE: usize = 48000;
-const DOWNSAMPLE_RATIO: usize = 4;
+const DOWNSAMPLE_RATIO: usize = 8;
 const DOWNSAMPLED_RATE: usize = DEFAULT_SAMPLERATE / DOWNSAMPLE_RATIO;
 
 /// This is mostly identical to the gain example, minus some fluff, and with a GUI.
@@ -273,7 +273,7 @@ impl Default for VoiceMasterParams {
             ),
             pick_threshold: FloatParam::new(
                 "Pick Threshold",
-                0.999,
+                0.98,
                 FloatRange::Skewed {
                     min: 0.8,
                     max: 1.0,
@@ -504,17 +504,6 @@ impl Plugin for VoiceMaster {
                                     )
                                     .unwrap();
 
-                                println!("self.overlap_signal.len: {}", &self.overlap_signal.len());
-                                println!("self.overlap_signal[100]: {}", &self.overlap_signal[100]);
-                                println!(
-                                    "self.resampled_signal.len: {}",
-                                    &self.resampled_signal.len()
-                                );
-                                println!(
-                                    "self.resampled_signal[100]: {}",
-                                    &self.resampled_signal[100]
-                                );
-
                                 // println!("self.sample_rate/DOWNSAMPLE_RATIO: {}", self.sample_rate/DOWNSAMPLE_RATIO as f32);
 
                                 // call the pitchtracker
@@ -523,9 +512,10 @@ impl Plugin for VoiceMaster {
                                     - MIN_DETECTOR_SIZE_POWER];
                                 self.pitch_val = mc_pitch::pitch(
                                     self.sample_rate / DOWNSAMPLE_RATIO as f32,
+                                    // self.sample_rate,
                                     &self.resampled_signal,
                                     detector,
-                                    self.params.power_threshold.value(),
+                                    self.params.power_threshold.value() / DOWNSAMPLE_RATIO as f32,
                                     // clarity_threshold: use 0.0, so all pitch & clarity values are let trough
                                     // we filter the pitches downstream but let all clarity values trough,
                                     // for usage in the faust de-esser and re-esser
@@ -534,13 +524,16 @@ impl Plugin for VoiceMaster {
                                 );
 
                                 // call the other pitchtracker
-                                // let (hz, _amplitude) = detect(
-                                // &self.resampled_signal,
-                                // &mut self.bin,
-                                // );
-                                let hz = self.pitch_val[0];
-
-                                println!("hz: {}", hz);
+                                let (hz_raw, _amplitude) = detect(
+                                    // &self.overlap_signal,
+                                    &self.resampled_signal,
+                                    &mut self.bin,
+                                );
+                                // compensate for different samplerate
+                                let hz =
+                                    hz_raw / DOWNSAMPLE_RATIO as f32 / DEFAULT_SAMPLERATE as f32
+                                        * self.sample_rate;
+                                // let hz = self.pitch_val[0];
 
                                 // if clarity is high enough
                                 if self.pitch_val[1] > self.params.clarity_threshold.value()
