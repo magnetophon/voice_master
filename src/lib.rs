@@ -4,6 +4,7 @@ use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
 use simple_eq::design::Curve;
 use simple_eq::Equalizer;
+use std::slice;
 use std::sync::Arc;
 
 use rubato::{FftFixedInOut, Resampler};
@@ -79,8 +80,9 @@ const MAX_SIZE: usize = 2_usize.pow(MAX_DETECTOR_SIZE_POWER as u32);
 /// the maximum nr of times the detector is updated each 2048 samples
 const MAX_OVERLAP: usize = 512;
 /// The median is taken from at max this nr of pitches
+const DEFAULT_SAMPLERATE: usize = 48000;
 const DOWNSAMPLE_RATIO: usize = 8;
-const DOWNSAMPLED_RATE: usize = 6000;
+const DOWNSAMPLED_RATE: usize = DEFAULT_SAMPLERATE / DOWNSAMPLE_RATIO;
 
 /// This is mostly identical to the gain example, minus some fluff, and with a GUI.
 pub struct VoiceMaster {
@@ -104,6 +106,8 @@ pub struct VoiceMaster {
     signal_index: usize,
     /// ovelapping segments of the signal, to feed the pitchtrackers
     overlap_signal: Vec<f32>,
+    /// resampled signal
+    resampled_signal: Vec<f32>,
     // bitstream for pitch calculation
     bin: BitStream,
     /// the curent pitch and clarity
@@ -181,6 +185,7 @@ impl Default for VoiceMaster {
             signal: vec![0.0; MAX_SIZE],
             signal_index: 0,
             overlap_signal: vec![0.0; MAX_SIZE],
+            resampled_signal: vec![0.0; MAX_SIZE / DOWNSAMPLE_RATIO],
             bin: BitStream::new(&vec![0.0; MAX_SIZE], 0.0),
             pitch_val: [-1.0, 0.0],
             previous_saw: 0.0,
@@ -196,9 +201,15 @@ impl Default for VoiceMaster {
                 McLeodDetector::new(2, 1),
                 McLeodDetector::new(2, 1),
             ],
-            eq: Equalizer::new(48000.0),
+            eq: Equalizer::new(DEFAULT_SAMPLERATE as f32),
 
-            resampler: FftFixedInOut::<f32>::new(48000, DOWNSAMPLED_RATE, 2048, 1).unwrap(),
+            resampler: FftFixedInOut::<f32>::new(
+                DEFAULT_SAMPLERATE,
+                DOWNSAMPLED_RATE,
+                2048 / DOWNSAMPLE_RATIO,
+                1,
+            )
+            .unwrap(),
         }
     }
 }
@@ -385,7 +396,8 @@ impl Plugin for VoiceMaster {
 
         for i in 0..NR_OF_DETECTORS {
             // let size = 2^i;
-            let size = 2_usize.pow((i + MIN_DETECTOR_SIZE_POWER) as u32);
+            let size = (2_usize.pow((i + MIN_DETECTOR_SIZE_POWER) as u32)) / DOWNSAMPLE_RATIO;
+            println!("size: {}", size);
             let padding = size / 2;
             self.detectors[i] = McLeodDetector::new(size, padding);
         }
@@ -399,7 +411,6 @@ impl Plugin for VoiceMaster {
         _aux: &mut AuxiliaryBuffers,
         context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
-
         let mut channel_counter = 0;
         let size = 2_usize.pow((self.params.detector_size.value() as usize) as u32);
         let overlap = self.params.overlap.value() as usize * size / 2048;
@@ -446,9 +457,9 @@ impl Plugin for VoiceMaster {
                         self.signal[self.signal_index] = sample_filtered as f32;
                         // }
                         // if the user chooses to sync up the audio with the pitch
-                            if self.params.latency.value() {
-                                if self.signal_index >= size {
-                                    //     // delay our sample
+                        if self.params.latency.value() {
+                            if self.signal_index >= size {
+                                //     // delay our sample
                                 *sample = self.delay_line[(self.signal_index - size) % MAX_SIZE];
                             }
                         }
@@ -468,7 +479,9 @@ impl Plugin for VoiceMaster {
                                 let index_plus_size = (self.signal_index + size) % MAX_SIZE;
                                 // if no wrap around:
                                 if (self.signal_index) < index_plus_size {
-                                    self.overlap_signal.copy_from_slice(&self.signal[self.signal_index..index_plus_size]);
+                                    self.overlap_signal.copy_from_slice(
+                                        &self.signal[self.signal_index..index_plus_size],
+                                    );
                                     // if we do have a wrap around:
                                 } else {
                                     // self.overlap_signal =
@@ -480,27 +493,37 @@ impl Plugin for VoiceMaster {
                                         .extend_from_slice(&self.signal[..index_plus_size]);
                                 };
 
-                                println!("MAX_SIZE: {}", MAX_SIZE);
+                                // println!("MAX_SIZE: {}", MAX_SIZE);
                                 // resample:
-                                let resampled = {
-                                    let resampled = Vec::with_capacity(MAX_SIZE);
-                                    self.resampler.process_into_buffer(
-                                        &[self.overlap_signal.as_mut_slice()],
-                                        &mut [resampled.clone()],
+
+                                self.resampler
+                                    .process_into_buffer(
+                                        &mut [self.overlap_signal.as_mut_slice()],
+                                        slice::from_mut(&mut self.resampled_signal),
                                         None,
-                                    ).unwrap();
-                                    resampled
-                                };                                // self.overlap_signal = Vec::from(resampled);
-                                // self.overlap_signal.clear();
-                                // self.overlap_signal.extend_from_slice(&resampled);
+                                    )
+                                    .unwrap();
+
+                                println!("self.overlap_signal.len: {}", &self.overlap_signal.len());
+                                println!("self.overlap_signal[100]: {}", &self.overlap_signal[100]);
+                                println!(
+                                    "self.resampled_signal.len: {}",
+                                    &self.resampled_signal.len()
+                                );
+                                println!(
+                                    "self.resampled_signal[100]: {}",
+                                    &self.resampled_signal[100]
+                                );
+
+                                // println!("self.sample_rate/DOWNSAMPLE_RATIO: {}", self.sample_rate/DOWNSAMPLE_RATIO as f32);
+
                                 // call the pitchtracker
                                 let detector = &mut self.detectors[self.params.detector_size.value()
-                                                                   as usize
-                                                                   - MIN_DETECTOR_SIZE_POWER];
+                                    as usize
+                                    - MIN_DETECTOR_SIZE_POWER];
                                 self.pitch_val = mc_pitch::pitch(
-                                    self.sample_rate,
-                                    &resampled,
-                                    // &resampled.clone(),
+                                    self.sample_rate / DOWNSAMPLE_RATIO as f32,
+                                    &self.resampled_signal,
                                     detector,
                                     self.params.power_threshold.value(),
                                     // clarity_threshold: use 0.0, so all pitch & clarity values are let trough
@@ -511,14 +534,13 @@ impl Plugin for VoiceMaster {
                                 );
 
                                 // call the other pitchtracker
-                                let (hz, _amplitude) = detect(
-                                    // &self.overlap_signal .as_slice().iter().map(|&x| x as f64).collect::<Vec<f64>>()
-                                    &resampled
-                                        , &mut self.bin
-                                        ,);
-                                // let hz = self.pitch_val[0];
+                                // let (hz, _amplitude) = detect(
+                                // &self.resampled_signal,
+                                // &mut self.bin,
+                                // );
+                                let hz = self.pitch_val[0];
 
-                                // println!("hz: {}",hz);
+                                println!("hz: {}", hz);
 
                                 // if clarity is high enough
                                 if self.pitch_val[1] > self.params.clarity_threshold.value()
