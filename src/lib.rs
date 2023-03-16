@@ -17,6 +17,9 @@ mod mc_pitch;
 //
 //
 // compare pitch trackers:
+//
+// https://github.com/sevagh/pitch-detection/tree/master/misc/mcleod
+//
 // https://docs.rs/pyin/1.0.2/pyin/
 // https://crates.io/crates/irapt
 // https://crates.io/crates/pitch
@@ -458,6 +461,7 @@ impl Plugin for VoiceMaster {
                             // && (downsampling_index == 0)
                             {
                                 self.overlap_signal.resize(size, 0.0);
+                                // TODO: use https://crates.io/crates/bit_mask_ring_buf/ might be more efficient
                                 // check if the end wraps around:
                                 let index_plus_size = (self.signal_index + size) % MAX_SIZE;
                                 // if no wrap around:
