@@ -404,6 +404,7 @@ impl Plugin for VoiceMaster {
         let size = 2_isize.pow((self.params.detector_size.value() as isize) as u32);
         let overlap = self.params.overlap.value() as usize;
 
+
         // set the latency, cannot do that from a callback
         if self.params.latency.value() {
             context.set_latency_samples(size as u32);
@@ -447,11 +448,11 @@ impl Plugin for VoiceMaster {
                         // }
                         // if the user chooses to sync up the audio with the pitch
                         if self.params.latency.value() {
-                            if self.signal_index >= size {
+                            // if self.signal_index >= size {
                                 //     // delay our sample
                                 *sample =
-                                    self.delay_line[(self.signal_index - size) % MAX_SIZE as isize];
-                            }
+                                    self.delay_line[self.signal_index - size];
+                            // }
                         }
 
                         // update the index
@@ -469,16 +470,16 @@ impl Plugin for VoiceMaster {
                             ) == 0
                             // && (downsampling_index == 0)
                             {
-                                let index_plus_size =
-                                    (self.signal_index + size) % MAX_SIZE as isize;
+                                // let index_plus_size =
+                                    // (self.signal_index + size) % MAX_SIZE as isize;
                                 let slices =
                                     self.signal.as_slices_len(self.signal_index, size as usize);
                                 self.overlap_signal.clear();
                                 self.overlap_signal.extend_from_slice(&slices.0);
                                 // if wrap around:
-                                if (self.signal_index) >= index_plus_size {
-                                    self.overlap_signal.extend_from_slice(&slices.1);
-                                };
+                                // if (self.signal_index) >= index_plus_size {
+                                self.overlap_signal.extend_from_slice(&slices.1);
+                                // };
 
                                 // call the pitchtracker
                                 let detector = &mut self.detectors[self.params.detector_size.value()
