@@ -78,7 +78,7 @@ const MAX_DETECTOR_SIZE_POWER: usize = 13;
 /// the number of detectors we need, one for each size
 const NR_OF_DETECTORS: usize = MAX_DETECTOR_SIZE_POWER - MIN_DETECTOR_SIZE_POWER + 1;
 /// the maximum size of the detectors
-const MAX_SIZE: usize = 2_usize.pow(MAX_DETECTOR_SIZE_POWER as u32);
+const MAX_SIZE: isize = 2_isize.pow(MAX_DETECTOR_SIZE_POWER as u32);
 /// the maximum nr of times the detector is updated each 2048 samples
 const MAX_OVERLAP: usize = 512;
 /// default samplerate
@@ -179,12 +179,12 @@ impl Default for VoiceMaster {
             peak_meter_decay_weight: 1.0,
             peak_meter: Arc::new(AtomicF32::new(util::MINUS_INFINITY_DB)),
             sample_rate: 0.0,
-            delay_line: BMRingBuf::<f32>::from_len(MAX_SIZE),
-            signal: BMRingBuf::<f32>::from_len(MAX_SIZE),
+            delay_line: BMRingBuf::<f32>::from_len(MAX_SIZE as usize),
+            signal: BMRingBuf::<f32>::from_len(MAX_SIZE as usize),
             signal_index: 0,
             // overlap_signal: BMRingBuf::<f32>::from_len(MAX_SIZE),
-            overlap_signal: vec![0.0; MAX_SIZE],
-            bin: BitStream::new(&vec![0.0; MAX_SIZE], 0.0),
+            overlap_signal: vec![0.0; MAX_SIZE as usize],
+            bin: BitStream::new(&vec![0.0; MAX_SIZE as usize], 0.0),
             pitch_val: [-1.0, 0.0],
             previous_saw: 0.0,
             final_pitch: 0.0,
@@ -411,6 +411,8 @@ impl Plugin for VoiceMaster {
         } else {
             context.set_latency_samples(0);
         }
+        // make sure the index doesn't get too big
+        self.signal_index %= MAX_SIZE;
 
         // set the filter frequencies
         self.eq
@@ -456,7 +458,8 @@ impl Plugin for VoiceMaster {
                         }
 
                         // update the index
-                        self.signal_index = (self.signal_index + 1) % MAX_SIZE as isize;
+                        // self.signal_index = (self.signal_index + 1) % MAX_SIZE as isize;
+                        self.signal_index += 1;
 
                         // do overlap nr of times:
                         for i in 0..overlap {
