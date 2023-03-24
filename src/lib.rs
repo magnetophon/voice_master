@@ -6,6 +6,7 @@ use simple_eq::design::Curve;
 use simple_eq::Equalizer;
 use std::sync::Arc;
 
+use bit_mask_ring_buf::BMRingBuf;
 use pitch::detect;
 use pitch::BitStream;
 use pitch_detection::detector::mcleod::McLeodDetector;
@@ -98,12 +99,13 @@ pub struct VoiceMaster {
     /// sample rate
     sample_rate: f32,
     /// the delay-line to use for the latency compensation
-    delay_line: Vec<f32>,
+    delay_line: BMRingBuf<f32>,
     /// the signal to be used in the pitchtrackers
-    signal: Vec<f32>,
+    signal: BMRingBuf<f32>,
     /// the sample index of the above signal
-    signal_index: usize,
+    signal_index: isize,
     /// ovelapping segments of the signal, to feed the pitchtrackers
+    // overlap_signal: BMRingBuf<f32>,
     overlap_signal: Vec<f32>,
     // bitstream for pitch calculation
     bin: BitStream,
@@ -177,9 +179,10 @@ impl Default for VoiceMaster {
             peak_meter_decay_weight: 1.0,
             peak_meter: Arc::new(AtomicF32::new(util::MINUS_INFINITY_DB)),
             sample_rate: 0.0,
-            delay_line: vec![0.0; MAX_SIZE],
-            signal: vec![0.0; MAX_SIZE],
+            delay_line: BMRingBuf::<f32>::from_len(MAX_SIZE),
+            signal: BMRingBuf::<f32>::from_len(MAX_SIZE),
             signal_index: 0,
+            // overlap_signal: BMRingBuf::<f32>::from_len(MAX_SIZE),
             overlap_signal: vec![0.0; MAX_SIZE],
             bin: BitStream::new(&vec![0.0; MAX_SIZE], 0.0),
             pitch_val: [-1.0, 0.0],
@@ -398,7 +401,7 @@ impl Plugin for VoiceMaster {
         context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
         let mut channel_counter = 0;
-        let size = 2_usize.pow((self.params.detector_size.value() as usize) as u32);
+        let size = 2_isize.pow((self.params.detector_size.value() as isize) as u32);
         let overlap = self.params.overlap.value() as usize;
 
         // set the latency, cannot do that from a callback
@@ -446,38 +449,35 @@ impl Plugin for VoiceMaster {
                         if self.params.latency.value() {
                             if self.signal_index >= size {
                                 //     // delay our sample
-                                *sample = self.delay_line[(self.signal_index - size) % MAX_SIZE];
+                                *sample =
+                                    self.delay_line[(self.signal_index - size) % MAX_SIZE as isize];
                             }
                         }
 
                         // update the index
-                        self.signal_index = (self.signal_index + 1) % MAX_SIZE;
+                        self.signal_index = (self.signal_index + 1) % MAX_SIZE as isize;
 
                         // do overlap nr of times:
                         for i in 0..overlap {
                             // if index[i] == 0
                             // so IOW: when the buffer is full
-                            if staggered_index(i, self.signal_index, size, overlap) == 0
+                            if staggered_index(
+                                i,
+                                self.signal_index as usize,
+                                size as usize,
+                                overlap,
+                            ) == 0
                             // && (downsampling_index == 0)
                             {
-                                self.overlap_signal.resize(size, 0.0);
-                                // TODO: use https://crates.io/crates/bit_mask_ring_buf/ might be more efficient
-                                // check if the end wraps around:
-                                let index_plus_size = (self.signal_index + size) % MAX_SIZE;
-                                // if no wrap around:
-                                if (self.signal_index) < index_plus_size {
-                                    self.overlap_signal.copy_from_slice(
-                                        &self.signal[self.signal_index..index_plus_size],
-                                    );
-                                    // if we do have a wrap around:
-                                } else {
-                                    // self.overlap_signal =
-
-                                    self.overlap_signal.clear();
-                                    self.overlap_signal
-                                        .extend_from_slice(&self.signal[self.signal_index..]);
-                                    self.overlap_signal
-                                        .extend_from_slice(&self.signal[..index_plus_size]);
+                                let index_plus_size =
+                                    (self.signal_index + size) % MAX_SIZE as isize;
+                                let slices =
+                                    self.signal.as_slices_len(self.signal_index, size as usize);
+                                self.overlap_signal.clear();
+                                self.overlap_signal.extend_from_slice(&slices.0);
+                                // if wrap around:
+                                if (self.signal_index) >= index_plus_size {
+                                    self.overlap_signal.extend_from_slice(&slices.1);
                                 };
 
                                 // call the pitchtracker

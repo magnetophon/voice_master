@@ -35,6 +35,8 @@ simple-eq = { git = "https://github.com/m-hilgendorf/simple-eq.git" }
 
 realfft = "3.2.0"
 
+bit_mask_ring_buf = "0.5"
+
 [profile.release]
 lto = "thin"
 strip = "symbols"
