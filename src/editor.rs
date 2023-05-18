@@ -21,7 +21,7 @@ impl Model for Data {}
 
 // Makes sense to also define this here, makes it a bit easier to keep track of
 pub(crate) fn default_state() -> Arc<ViziaState> {
-    ViziaState::new(|| (350, 600))
+    ViziaState::new(|| (480, 640))
 }
 
 pub(crate) fn create(
@@ -52,7 +52,7 @@ pub(crate) fn create(
                 .child_top(Stretch(1.0))
                 .child_bottom(Pixels(0.0))
                 // Make this more or less align with the parameters column
-                .right(Pixels(67.0));
+                .right(Pixels(60.0));
 
             GenericUi::new(cx, Data::params).child_top(Pixels(0.0));
             PeakMeter::new(

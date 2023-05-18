@@ -80,7 +80,7 @@ const NR_OF_DETECTORS: usize = MAX_DETECTOR_SIZE_POWER - MIN_DETECTOR_SIZE_POWER
 /// the maximum size of the detectors
 const MAX_SIZE: isize = 2_isize.pow(MAX_DETECTOR_SIZE_POWER as u32);
 /// the maximum nr of times the detector is updated each 2048 samples
-const MAX_OVERLAP: usize = 512;
+const MAX_OVERLAP: usize = 2048;
 /// default samplerate
 const DEFAULT_SAMPLERATE: f32 = 48000.0;
 
@@ -238,14 +238,14 @@ impl Default for VoiceMasterParams {
             .with_string_to_value(formatters::s2v_i32_power_of_two()),
 
             overlap: IntParam::new(
-                "Overlap",
-                512,
+                "Samples between pitch values",
+                4,
                 IntRange::Linear {
                     min: 1,
                     max: MAX_OVERLAP as i32,
                 },
             )
-            .with_unit(" times/buffer"),
+            .with_unit(" samples"),
 
             power_threshold: FloatParam::new(
                 "Power Threshold",
@@ -461,84 +461,74 @@ impl Plugin for VoiceMaster {
                         // self.signal_index = (self.signal_index + 1) % MAX_SIZE as isize;
                         self.signal_index += 1;
 
-                        // do overlap nr of times:
-                        for i in 0..overlap {
-                            // if index[i] == 0
-                            // so IOW: when the buffer is full
-                            if staggered_index(
-                                i,
-                                self.signal_index as usize,
-                                size as usize,
-                                overlap,
-                            ) == 0
-                            // && (downsampling_index == 0)
+                        if self.signal_index as usize % overlap == 0
+                        // && (downsampling_index == 0)
+                        {
+                            // let index_plus_size =
+                            // (self.signal_index + size) % MAX_SIZE as isize;
+                            let slices =
+                                self.signal.as_slices_len(self.signal_index, size as usize);
+                            self.overlap_signal.clear();
+                            self.overlap_signal.extend_from_slice(&slices.0);
+                            // if wrap around:
+                            // if (self.signal_index) >= index_plus_size {
+                            self.overlap_signal.extend_from_slice(&slices.1);
+                            // };
+
+                            // call the pitchtracker
+                            let detector = &mut self.detectors[self.params.detector_size.value()
+                                                               as usize
+                                                               - MIN_DETECTOR_SIZE_POWER];
+                            self.pitch_val = mc_pitch::pitch(
+                                self.sample_rate,
+                                &self.overlap_signal,
+                                // &resampled.clone(),
+                                detector,
+                                self.params.power_threshold.value(),
+                                // clarity_threshold: use 0.0, so all pitch & clarity values are let trough
+                                // we filter the pitches downstream but let all clarity values trough,
+                                // for usage in the faust de-esser and re-esser
+                                0.0,
+                                self.params.pick_threshold.value(),
+                            );
+
+                            // call the other pitchtracker
+                            let (hz_raw, _amplitude) = detect(
+                                // &self.overlap_signal .as_slice().iter().map(|&x| x as f64).collect::<Vec<f64>>()
+                                &self.overlap_signal,
+                                &mut self.bin,
+                            );
+                            let hz = hz_raw * DEFAULT_SAMPLERATE / self.sample_rate;
+                            // let hz = self.pitch_val[0];
+
+                            // println!("hz: {}",hz);
+
+                            // if clarity is high enough
+                            if self.pitch_val[1] > self.params.clarity_threshold.value()
+                            // and the pitch isn't too low or too high
+                                && self.pitch_val[0] > self.params.min_pitch.value()
+                                && self.pitch_val[0] < self.params.max_pitch.value()
+                                && (hz as f32) > self.params.min_pitch.value()
+                                && (hz as f32) < self.params.max_pitch.value()
                             {
-                                // let index_plus_size =
-                                    // (self.signal_index + size) % MAX_SIZE as isize;
-                                let slices =
-                                    self.signal.as_slices_len(self.signal_index, size as usize);
-                                self.overlap_signal.clear();
-                                self.overlap_signal.extend_from_slice(&slices.0);
-                                // if wrap around:
-                                // if (self.signal_index) >= index_plus_size {
-                                self.overlap_signal.extend_from_slice(&slices.1);
-                                // };
-
-                                // call the pitchtracker
-                                let detector = &mut self.detectors[self.params.detector_size.value()
-                                    as usize
-                                    - MIN_DETECTOR_SIZE_POWER];
-                                self.pitch_val = mc_pitch::pitch(
-                                    self.sample_rate,
-                                    &self.overlap_signal,
-                                    // &resampled.clone(),
-                                    detector,
-                                    self.params.power_threshold.value(),
-                                    // clarity_threshold: use 0.0, so all pitch & clarity values are let trough
-                                    // we filter the pitches downstream but let all clarity values trough,
-                                    // for usage in the faust de-esser and re-esser
-                                    0.0,
-                                    self.params.pick_threshold.value(),
-                                );
-
-                                // call the other pitchtracker
-                                let (hz_raw, _amplitude) = detect(
-                                    // &self.overlap_signal .as_slice().iter().map(|&x| x as f64).collect::<Vec<f64>>()
-                                    &self.overlap_signal,
-                                    &mut self.bin,
-                                );
-                                let hz = hz_raw * DEFAULT_SAMPLERATE / self.sample_rate;
-                                // let hz = self.pitch_val[0];
-
-                                // println!("hz: {}",hz);
-
-                                // if clarity is high enough
-                                if self.pitch_val[1] > self.params.clarity_threshold.value()
-                                // and the pitch isn't too low or too high
-                                    && self.pitch_val[0] > self.params.min_pitch.value()
-                                    && self.pitch_val[0] < self.params.max_pitch.value()
-                                    && (hz as f32) > self.params.min_pitch.value()
-                                    && (hz as f32) < self.params.max_pitch.value()
-                                {
-                                    let diff: f32 = if (hz as f32) < self.pitch_val[0] {
-                                        (1.0 - (hz as f32 / self.pitch_val[0])).abs()
-                                    } else {
-                                        (1.0 - (self.pitch_val[0] / hz as f32)).abs()
-                                    };
-                                    if diff < self.params.max_diff.value() {
-                                        self.final_pitch = self.pitch_val[0];
-                                    }
-                                    // else {
-                                    // println!(
-                                    // "mc_pitch: {}, hz: {}, diff: {}, change {}",
-                                    // self.pitch_val[0],
-                                    // hz,
-                                    // diff,
-                                    // self.params.max_diff.value()
-                                    // );
-                                    // };
+                                let diff: f32 = if (hz as f32) < self.pitch_val[0] {
+                                    (1.0 - (hz as f32 / self.pitch_val[0])).abs()
+                                } else {
+                                    (1.0 - (self.pitch_val[0] / hz as f32)).abs()
                                 };
-                            }
+                                if diff < self.params.max_diff.value() {
+                                    self.final_pitch = self.pitch_val[0];
+                                }
+                                // else {
+                                // println!(
+                                // "mc_pitch: {}, hz: {}, diff: {}, change {}",
+                                // self.pitch_val[0],
+                                // hz,
+                                // diff,
+                                // self.params.max_diff.value()
+                                // );
+                                // };
+                            };
                         }
                     }
                     // positive saw at 1/4 freq, see https://github.com/magnetophon/VoiceOfFaust/blob/V1.1.4/lib/master.lib#L8
@@ -572,10 +562,6 @@ impl Plugin for VoiceMaster {
                 self.peak_meter
                     .store(new_peak_meter, std::sync::atomic::Ordering::Relaxed)
             }
-        }
-
-        fn staggered_index(i: usize, index: usize, size: usize, overlap: usize) -> usize {
-            (index + (i * (size / overlap))) % size
         }
 
         ProcessStatus::Normal
