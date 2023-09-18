@@ -17,6 +17,21 @@ mod mc_pitch;
 // TODO:
 //
 //
+// https://github.com/antoineschmitt/dywapitchtrack/blob/ff251761c6cfb1e6b9ffd9ffefacc7709aff508a/src/dywapitchtrack.c#L343C1-L355C5
+//
+// ***********************************
+// the dynamic postprocess
+// ***********************************
+
+// It states:
+// - a pitch cannot change much all of a sudden (20%) (impossible humanly,
+// so if such a situation happens, consider that it is a mistake and drop it.
+// - a pitch cannot double or be divided by 2 all of a sudden : it is an
+// algorithm side-effect : divide it or double it by 2.
+// - a lonely voiced pitch cannot happen, nor can a sudden drop in the middle
+// of a voiced segment. Smooth the plot.
+//
+//
 // compare pitch trackers:
 //
 // https://github.com/sevagh/pitch-detection/tree/master/misc/mcleod
