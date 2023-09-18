@@ -254,7 +254,7 @@ impl Default for VoiceMasterParams {
 
             overlap: IntParam::new(
                 "Samples between pitch values",
-                4,
+                13,
                 IntRange::Linear {
                     min: 1,
                     max: MAX_OVERLAP as i32,
@@ -375,7 +375,7 @@ impl Plugin for VoiceMaster {
         self.params.clone()
     }
 
-    fn editor(&self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
+    fn editor(& mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         editor::create(
             self.params.clone(),
             self.peak_meter.clone(),
