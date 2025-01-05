@@ -1,0 +1,12 @@
+#+title: Todo
+
+Auto Tune patent has expired
+https://patents.google.com/patent/US5973252A/en
+https://www.youtube.com/watch?v=uX-FVtQT0PQ
+
+* from Marius CrispyTuner
+basically you wanna use TD-PSOLA to preserve formants instead of just speeding up/slowing down the audio
+and you usually wanna use an FFT on top of the “cheated” autocorrelation from the patent to reduce octave errors
+additional details: https://www.youtube.com/watch?v=4TtpQn1ovaE
+https://github.com/CrushedPixel?language=&page=2&q=&sort=&tab=repositories
+marius@crushedpixel.net
